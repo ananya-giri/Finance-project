@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinIntel — AI Financial Intelligence Platform</title>
+  <meta name="description" content="Enterprise-grade AI Financial Intelligence Platform with 5-year historical data ingestion, structured metrics, document management, and automated report monitoring." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M7 16l4-4 4 4 4-8" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="g1" x1="7" y1="16" x2="19" y2="8" gradientUnits="userSpaceOnUse"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+        </svg>
+      </div>
+      <span class="brand-name">FinIntel</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-group">
+        <span class="nav-label">Overview</span>
+        <a href="#" class="nav-item active" data-tab="dashboard" id="nav-dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <span class="nav-label">Data Management</span>
+        <a href="#" class="nav-item" data-tab="ingest" id="nav-ingest">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Ingest Historical Data
+          <span class="badge badge-fr">FR-001</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="documents" id="nav-documents">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Document Upload
+          <span class="badge badge-fr">FR-002</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <span class="nav-label">Analytics</span>
+        <a href="#" class="nav-item" data-tab="metrics" id="nav-metrics">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Financial Metrics
+          <span class="badge badge-fr">FR-003</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="scheduler" id="nav-scheduler">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Auto-Monitoring
+          <span class="badge badge-fr">FR-004</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="api-status" id="api-status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title" id="page-title">Dashboard</h1>
+        <p class="page-subtitle" id="page-subtitle">Financial Intelligence Overview</p>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="global-search" placeholder="Search companies, metrics..." autocomplete="off" />
+        </div>
+        <button class="btn btn-primary" id="quick-ingest-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Quick Ingest
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Panels -->
+
+    <!-- ===== DASHBOARD TAB ===== -->
+    <section class="tab-panel active" id="tab-dashboard">
+      <!-- Stats Row -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Tracked Companies</span>
+            <span class="stat-value" id="stat-companies">—</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-cyan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">5-Year History Complete</span>
+            <span class="stat-value" id="stat-fiveyear">—</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Documents Ingested</span>
+            <span class="stat-value" id="stat-documents">—</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Auto-Watcher</span>
+            <span class="stat-value" id="stat-watcher">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Company Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            Tracked Companies
+          </h2>
+          <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="companies-table">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Company</th>
+                <th>Sector</th>
+                <th>Years of Data</th>
+                <th>5-Yr History</th>
+                <th>Latest Period</th>
+                <th>Auto-Sync</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="companies-tbody">
+              <tr><td colspan="8" class="empty-row"><div class="spinner"></div> Loading companies...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== INGEST HISTORICAL TAB ===== -->
+    <section class="tab-panel" id="tab-ingest">
+      <div class="two-col">
+        <!-- Form -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              FR-001: Ingest 5-Year Historical Data
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="fr-badge-row">
+              <span class="fr-pill fr-001">FR-001</span>
+              <p>Fetches Income Statements, Balance Sheets, and Cash Flow Statements via Yahoo Finance for a minimum of 5 years.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ingest-ticker">Stock Ticker Symbol</label>
+              <div class="input-with-btn">
+                <input type="text" id="ingest-ticker" class="form-input" placeholder="e.g. AAPL, MSFT, TSLA, GOOGL" autocomplete="off" />
+              </div>
+              <span class="form-hint">Enter any valid US stock ticker (NYSE / NASDAQ)</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ingest-years">Minimum History Years</label>
+              <input type="number" id="ingest-years" class="form-input" value="5" min="1" max="20" />
+              <span class="form-hint">FR-001 mandates a minimum of 5 years</span>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="ingest-btn" onclick="ingestHistoricalData()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Start Ingestion
+            </button>
+
+            <div id="ingest-result" class="result-box hidden"></div>
+          </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              What Gets Ingested
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="feature-list">
+              <div class="feature-item">
+                <div class="feature-dot dot-purple"></div>
+                <div>
+                  <strong>Income Statements</strong>
+                  <p>Revenue, EBIT, Net Profit, EPS — Annual & Quarterly</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-dot dot-cyan"></div>
+                <div>
+                  <strong>Balance Sheets</strong>
+                  <p>Total Assets, Equity, Debt — for ratio computation</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-dot dot-green"></div>
+                <div>
+                  <strong>Cash Flow Statements</strong>
+                  <p>Operating Cash Flow, CapEx, Free Cash Flow</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-dot dot-amber"></div>
+                <div>
+                  <strong>10 Structured Metrics (FR-003)</strong>
+                  <p>Revenue, EBITDA, EBIT, Net Profit, Operating Margin, Cash Flow, Debt Ratio, EPS, ROE, ROA</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-dot dot-rose"></div>
+                <div>
+                  <strong>5-Year Compliance Check (FR-001)</strong>
+                  <p>Automatically backfills missing years if API returns fewer than 5</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="quick-tickers">
+              <span class="form-label">Quick-select popular tickers:</span>
+              <div class="ticker-chips">
+                <button class="chip" onclick="setTicker('AAPL')">AAPL</button>
+                <button class="chip" onclick="setTicker('MSFT')">MSFT</button>
+                <button class="chip" onclick="setTicker('GOOGL')">GOOGL</button>
+                <button class="chip" onclick="setTicker('TSLA')">TSLA</button>
+                <button class="chip" onclick="setTicker('AMZN')">AMZN</button>
+                <button class="chip" onclick="setTicker('META')">META</button>
+                <button class="chip" onclick="setTicker('NVDA')">NVDA</button>
+                <button class="chip" onclick="setTicker('JPM')">JPM</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DOCUMENTS TAB ===== -->
+    <section class="tab-panel" id="tab-documents">
+      <div class="two-col">
+        <!-- Upload Form -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              FR-002: Upload Financial Documents
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="fr-badge-row">
+              <span class="fr-pill fr-002">FR-002</span>
+              <p>Ingest 7 document types: Statements, Annual & Quarterly Reports, Investor Presentations, Earnings Call Transcripts.</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="doc-ticker">Ticker</label>
+              <input type="text" id="doc-ticker" class="form-input" placeholder="e.g. AAPL" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="doc-type">Document Type</label>
+              <select id="doc-type" class="form-input">
+                <option value="INCOME_STATEMENT">Income Statement</option>
+                <option value="BALANCE_SHEET">Balance Sheet</option>
+                <option value="CASH_FLOW">Cash Flow Statement</option>
+                <option value="ANNUAL_REPORT">Annual Report (10-K)</option>
+                <option value="QUARTERLY_REPORT">Quarterly Report (10-Q)</option>
+                <option value="INVESTOR_PRESENTATION">Investor Presentation</option>
+                <option value="EARNINGS_CALL_TRANSCRIPT">Earnings Call Transcript</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="doc-title">Document Title (optional)</label>
+              <input type="text" id="doc-title" class="form-input" placeholder="e.g. Apple Q4 2024 Earnings Transcript" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="doc-period">Fiscal Period</label>
+                <input type="text" id="doc-period" class="form-input" placeholder="e.g. 2024-FY, 2025-Q1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="doc-period-type">Period Type</label>
+                <select id="doc-period-type" class="form-input">
+                  <option value="ANNUAL">Annual</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Drop Zone -->
+            <div class="drop-zone" id="drop-zone">
+              <div class="drop-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <p class="drop-text">Drop file here or <span class="drop-link">browse</span></p>
+              <p class="drop-hint">Supports: PDF, CSV, XLSX, TXT, JSON</p>
+              <input type="file" id="doc-file" accept=".pdf,.csv,.xlsx,.xls,.txt,.json" style="display:none" />
+            </div>
+            <div id="file-selected-name" class="file-selected hidden"></div>
+
+            <button class="btn btn-primary btn-full" id="upload-btn" onclick="uploadDocument()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Document
+            </button>
+            <div id="upload-result" class="result-box hidden"></div>
+          </div>
+        </div>
+
+        <!-- Document Library -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Document Library
+            </h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadDocuments()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="docs-list" class="docs-list">
+            <div class="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <p>No documents yet. Upload your first document.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== METRICS TAB ===== -->
+    <section class="tab-panel" id="tab-metrics">
+      <div class="card metrics-search-card">
+        <div class="card-body metrics-search-body">
+          <div class="fr-badge-row">
+            <span class="fr-pill fr-003">FR-003</span>
+            <p>View all 10 structured financial metrics per company. Select a ticker and period type below.</p>
+          </div>
+          <div class="metrics-controls">
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="metrics-ticker">Company Ticker</label>
+              <input type="text" id="metrics-ticker" class="form-input" placeholder="e.g. AAPL" autocomplete="off" />
+            </div>
+            <div class="form-group" style="width:180px">
+              <label class="form-label" for="metrics-period">Period Type</label>
+              <select id="metrics-period" class="form-input">
+                <option value="ANNUAL">Annual</option>
+                <option value="QUARTERLY">Quarterly</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadMetrics()" style="align-self:flex-end">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Load Metrics
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Card -->
+      <div id="metrics-summary-card" class="card hidden">
+        <div class="card-header">
+          <h2 class="card-title" id="metrics-summary-title">Company Summary</h2>
+          <span id="metrics-health-badge" class="health-badge"></span>
+        </div>
+        <div id="metrics-summary-body" class="summary-kpi-grid"></div>
+      </div>
+
+      <!-- Metrics Timeline Table -->
+      <div id="metrics-table-card" class="card hidden">
+        <div class="card-header">
+          <h2 class="card-title" id="metrics-table-title">Historical Metrics Timeline</h2>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table metrics-table" id="metrics-data-table">
+            <thead id="metrics-thead"></thead>
+            <tbody id="metrics-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="metrics-empty" class="card">
+        <div class="empty-state">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.25"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <p>Enter a ticker above and click <strong>Load Metrics</strong> to view historical financial data.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCHEDULER TAB ===== -->
+    <section class="tab-panel" id="tab-scheduler">
+      <div class="two-col">
+        <!-- Scheduler Status -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              FR-004: Auto-Report Watcher
+            </h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadSchedulerStatus()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="scheduler-status-body" class="card-body">
+            <div class="spinner-center"><div class="spinner"></div></div>
+          </div>
+
+          <div class="card-body" style="padding-top:0">
+            <div class="action-btns">
+              <button class="btn btn-secondary" onclick="triggerManualCheck()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+                Run Check Now
+              </button>
+              <button class="btn btn-outline" onclick="showSimulatePanel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Simulate New Report
+              </button>
+            </div>
+
+            <!-- Simulate Panel -->
+            <div id="simulate-panel" class="simulate-panel hidden">
+              <div class="form-group">
+                <label class="form-label" for="sim-ticker">Ticker</label>
+                <input type="text" id="sim-ticker" class="form-input" placeholder="e.g. AAPL" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sim-type">Report Type</label>
+                <select id="sim-type" class="form-input">
+                  <option value="QUARTERLY_REPORT_10Q">Quarterly Report (10-Q)</option>
+                  <option value="ANNUAL_REPORT_10K">Annual Report (10-K)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sim-quarter">Fiscal Period (optional)</label>
+                <input type="text" id="sim-quarter" class="form-input" placeholder="e.g. 2025-Q4" />
+              </div>
+              <button class="btn btn-primary" onclick="simulateNewReport()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Simulate Report Release
+              </button>
+              <div id="simulate-result" class="result-box hidden"></div>
+            </div>
+
+            <div id="check-result" class="result-box hidden"></div>
+          </div>
+        </div>
+
+        <!-- Audit Logs -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Audit Logs
+            </h2>
+          </div>
+          <div id="audit-logs-list" class="audit-logs-list">
+            <div class="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              <p>No audit logs yet. Start auto-monitoring to see activity.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

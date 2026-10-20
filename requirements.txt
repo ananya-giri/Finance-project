@@ -1,0 +1,29 @@
+# Core Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.32
+
+# Database ORM
+sqlalchemy==2.0.35
+
+# Data Validation
+pydantic==2.9.2
+
+# Financial Data Provider (FR-001, FR-002)
+yfinance==0.2.44
+pandas==2.2.3
+
+# Scheduling Engine (FR-004)
+apscheduler==3.10.4
+
+# PDF Extraction (FR-002: Annual Reports, Quarterly Reports)
+pymupdf==1.24.11
+pdfplumber==0.11.4
+
+# Excel Support (FR-002: Balance Sheets, Income Statements)
+openpyxl==3.1.5
+xlrd==2.0.1
+
+# HTTP Client
+httpx==0.27.2
+requests==2.32.3
