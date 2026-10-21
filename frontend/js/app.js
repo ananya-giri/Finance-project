@@ -72,7 +72,8 @@ function switchTab(tabId) {
     ingest: { title: 'Historical Ingestion', sub: 'FR-001: 5-Year Financial Data Collection' },
     documents: { title: 'Document Upload', sub: 'FR-002: Statements, Presentations & Transcripts' },
     metrics: { title: 'Financial Metrics', sub: 'FR-003: 10 Core Structured Financial Metrics' },
-    scheduler: { title: 'Auto-Monitoring', sub: 'FR-004: Automated Report & Statement Watcher' }
+    scheduler: { title: 'Auto-Monitoring', sub: 'FR-004: Automated Report & Statement Watcher' },
+    'market-intelligence': { title: 'External Market Intelligence', sub: 'FR-005 to FR-009: Macro Indicators, Geopolitics, Regulations, News & Impact Classifier' }
   };
 
   if (titles[tabId]) {
@@ -84,6 +85,7 @@ function switchTab(tabId) {
   if (tabId === 'dashboard') loadDashboard();
   if (tabId === 'documents') loadDocuments();
   if (tabId === 'scheduler') loadSchedulerStatus();
+  if (tabId === 'market-intelligence') loadMarketIntelligence();
 }
 
 // Check Health
@@ -617,4 +619,685 @@ function showToast(msg) {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
   }, 3500);
+}
+
+// ============================================================================
+// MARKET INTELLIGENCE CLIENT LOGIC (FR-005 to FR-009)
+// ============================================================================
+
+let currentIntelSubtab = 'indicators';
+let cachedIndicators = [];
+let cachedEvents = [];
+let cachedNews = [];
+let currentIndicatorCategory = 'ALL';
+let currentGeoType = 'ALL';
+let currentGeoSeverity = 'ALL';
+
+function switchIntelSubtab(subtabId) {
+  currentIntelSubtab = subtabId;
+  document.querySelectorAll('.intel-subnav-btn').forEach(btn => {
+    if (btn.getAttribute('data-subtab') === subtabId) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  document.querySelectorAll('.intel-subview').forEach(view => {
+    if (view.id === `subview-${subtabId}`) {
+      view.classList.add('active');
+    } else {
+      view.classList.remove('active');
+    }
+  });
+
+  if (subtabId === 'indicators') loadIndicators(currentIndicatorCategory);
+  if (subtabId === 'geopolitical') loadMarketEvents(currentGeoType, currentGeoSeverity);
+  if (subtabId === 'news') loadMarketNews();
+  if (subtabId === 'classifier') loadImpactMatrix();
+}
+
+async function loadMarketIntelligence() {
+  try {
+    const res = await fetch('/api/market-intelligence/overview');
+    if (res.ok) {
+      const data = await res.json();
+      const elInd = document.getElementById('intel-stat-indicators');
+      const elEv = document.getElementById('intel-stat-events');
+      const elNews = document.getElementById('intel-stat-news');
+      const elAlerts = document.getElementById('intel-stat-alerts');
+
+      if (elInd) elInd.textContent = data.total_indicators_tracked || '28';
+      if (elEv) elEv.textContent = data.total_events || '—';
+      if (elNews) elNews.textContent = data.latest_critical_events ? data.total_events : '—';
+
+      const critCount = (data.severity_distribution?.CRITICAL || 0) + (data.severity_distribution?.HIGH || 0);
+      if (elAlerts) elAlerts.textContent = critCount;
+    }
+  } catch (err) {
+    console.warn('Overview fetch error:', err);
+  }
+
+  // Load active subtab
+  switchIntelSubtab(currentIntelSubtab);
+}
+
+// -------------------------------------------------------------
+// FR-005 & FR-006: ECONOMIC INDICATORS
+// -------------------------------------------------------------
+async function loadIndicators(category = 'ALL') {
+  currentIndicatorCategory = category;
+  const grid = document.getElementById('indicators-grid');
+  if (!grid) return;
+
+  grid.innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading economic indicators...</div>';
+
+  try {
+    let url = '/api/market-intelligence/indicators';
+    if (category && category !== 'ALL') {
+      url += `?category=${encodeURIComponent(category)}`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load indicators');
+    const data = await res.json();
+    cachedIndicators = data;
+
+    renderIndicatorsGrid(data);
+  } catch (err) {
+    grid.innerHTML = `<div class="empty-state"><p class="text-rose">Error loading indicators: ${err.message}</p></div>`;
+  }
+}
+
+function renderIndicatorsGrid(indicators) {
+  const grid = document.getElementById('indicators-grid');
+  if (!grid) return;
+
+  if (!indicators || indicators.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><p>No indicators match this filter.</p></div>';
+    return;
+  }
+
+  grid.innerHTML = indicators.map(ind => {
+    const change = ind.change_24h || 0;
+    const changePct = ind.change_pct_24h || 0;
+    const isUp = change > 0;
+    const isDown = change < 0;
+    const changeClass = isUp ? 'up' : (isDown ? 'down' : 'neutral');
+    const sign = isUp ? '+' : '';
+    const arrow = isUp ? '▲' : (isDown ? '▼' : '—');
+
+    const sparkSvg = generateSparklineSvg(ind.historical_sparkline, isUp);
+
+    // Format formatted value
+    let formattedVal = ind.current_value;
+    if (ind.category === 'EXCHANGE_RATE' || ind.unit === 'USD') {
+      formattedVal = Number(ind.current_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    } else if (ind.category === 'STOCK_INDEX') {
+      formattedVal = Number(ind.current_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+      formattedVal = Number(ind.current_value).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+    }
+
+    return `
+      <div class="indicator-card">
+        <div>
+          <div class="indicator-card-header">
+            <div>
+              <span class="indicator-symbol-tag">${ind.symbol}</span>
+              <div class="indicator-name" style="margin-top: 6px;">${ind.name}</div>
+            </div>
+            <span class="indicator-cat-badge badge-impact badge-impact-${ind.category.toLowerCase().split('_')[0]}">
+              ${ind.category.replace('_', ' ')}
+            </span>
+          </div>
+
+          <div class="indicator-value-row">
+            <div>
+              <span class="indicator-value">${formattedVal}</span>
+              <span class="indicator-unit">${ind.unit}</span>
+            </div>
+            <div class="indicator-change-pill ${changeClass}">
+              <span>${arrow}</span>
+              <span>${sign}${changePct}%</span>
+            </div>
+          </div>
+
+          <div class="sparkline-container">
+            ${sparkSvg}
+          </div>
+        </div>
+
+        <div class="indicator-card-footer">
+          <span>${ind.source}</span>
+          <span>${ind.frequency}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterIndicatorsCategory(cat) {
+  document.querySelectorAll('#indicator-category-pills .cat-pill').forEach(btn => {
+    if (btn.getAttribute('data-cat') === cat) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  loadIndicators(cat);
+}
+
+function filterIndicatorsSearch() {
+  const query = document.getElementById('indicator-search').value.toLowerCase().trim();
+  if (!query) {
+    renderIndicatorsGrid(cachedIndicators);
+    return;
+  }
+  const filtered = cachedIndicators.filter(i =>
+    i.name.toLowerCase().includes(query) ||
+    i.symbol.toLowerCase().includes(query) ||
+    i.category.toLowerCase().includes(query)
+  );
+  renderIndicatorsGrid(filtered);
+}
+
+async function syncIndicators() {
+  showToast('Collecting live economic indicators (FR-005)...');
+  try {
+    const res = await fetch('/api/market-intelligence/indicators/sync', { method: 'POST' });
+    const data = await res.json();
+    showToast(`Updated ${data.total_indicators || '28'} economic indicators!`);
+    loadIndicators(currentIndicatorCategory);
+    loadMarketIntelligence();
+  } catch (err) {
+    showToast(`Sync failed: ${err.message}`);
+  }
+}
+
+// Sparkline SVG generator
+function generateSparklineSvg(sparklineJson, isPositive) {
+  if (!sparklineJson) return '';
+  let pts = [];
+  try {
+    pts = JSON.parse(sparklineJson);
+  } catch (e) {
+    return '';
+  }
+  if (!pts || pts.length < 2) return '';
+
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const range = max - min || 1;
+  const width = 240;
+  const height = 36;
+  const padding = 3;
+
+  const strokeColor = isPositive ? '#10b981' : '#f43f5e';
+  const fillColor = isPositive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)';
+
+  const points = pts.map((val, idx) => {
+    const x = padding + (idx / (pts.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((val - min) / range) * (height - padding * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const pathD = `M ${points.join(' L ')}`;
+  const areaD = `${pathD} L ${width - padding},${height} L ${padding},${height} Z`;
+
+  return `
+    <svg class="sparkline-svg" viewBox="0 0 ${width} ${height}">
+      <path d="${areaD}" fill="${fillColor}" />
+      <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+}
+
+// -------------------------------------------------------------
+// FR-007: GEOPOLITICAL & REGULATORY EVENTS
+// -------------------------------------------------------------
+async function loadMarketEvents(eventType = 'ALL', severity = 'ALL') {
+  currentGeoType = eventType;
+  currentGeoSeverity = severity;
+
+  const container = document.getElementById('geopolitical-events-list');
+  if (!container) return;
+
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading geopolitical & regulatory events...</div>';
+
+  try {
+    let url = '/api/market-intelligence/events?limit=50';
+    if (eventType && eventType !== 'ALL') url += `&event_type=${encodeURIComponent(eventType)}`;
+    if (severity && severity !== 'ALL') url += `&severity=${encodeURIComponent(severity)}`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load events');
+    const events = await res.json();
+    cachedEvents = events;
+
+    renderMarketEvents(events);
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><p class="text-rose">Error loading events: ${err.message}</p></div>`;
+  }
+}
+
+function renderMarketEvents(events) {
+  const container = document.getElementById('geopolitical-events-list');
+  if (!container) return;
+
+  if (!events || events.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No geopolitical or regulatory events found for this filter.</p></div>';
+    return;
+  }
+
+  container.innerHTML = events.map(ev => {
+    const sevClass = `severity-${ev.severity.toLowerCase()}`;
+    const impactClass = `badge-impact-${ev.impact_category.toLowerCase()}`;
+
+    let sectors = [];
+    try { sectors = JSON.parse(ev.affected_sectors || '[]'); } catch (e) {}
+
+    let tickers = [];
+    try { tickers = JSON.parse(ev.affected_tickers || '[]'); } catch (e) {}
+
+    const evDate = new Date(ev.event_date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+
+    return `
+      <div class="event-card ${sevClass}">
+        <div class="event-card-header">
+          <div class="event-title">${ev.title}</div>
+          <div class="event-badges">
+            <span class="badge-impact ${impactClass}">${ev.impact_category}</span>
+            <span class="badge-severity badge-${sevClass}">${ev.severity}</span>
+          </div>
+        </div>
+
+        <p class="event-summary">${ev.summary}</p>
+
+        <div class="event-footer">
+          <div class="event-tags-wrap">
+            <span class="text-muted" style="font-size: 0.72rem;">Type: <strong>${ev.event_type.replace('_', ' ')}</strong></span>
+            ${sectors.map(s => `<span class="sector-tag">${s}</span>`).join('')}
+            ${tickers.map(t => `<span class="ticker-tag">${t}</span>`).join('')}
+          </div>
+          <div>
+            <span>${ev.source}</span> • <span>${evDate}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterGeoType(type) {
+  document.querySelectorAll('#geo-type-pills .cat-pill').forEach(btn => {
+    if (btn.getAttribute('data-type') === type) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  loadMarketEvents(type, currentGeoSeverity);
+}
+
+function filterGeoSeverity(sev) {
+  currentGeoSeverity = sev;
+  loadMarketEvents(currentGeoType, sev);
+}
+
+// -------------------------------------------------------------
+// FR-008: MARKET NEWS & ANALYST REPORTS
+// -------------------------------------------------------------
+async function loadMarketNews() {
+  const container = document.getElementById('market-news-list');
+  if (!container) return;
+
+  container.innerHTML = '<div class="loading-state"><div class="spinner"></div> Loading financial news and market reports...</div>';
+
+  try {
+    const res = await fetch('/api/market-intelligence/news?limit=40');
+    if (!res.ok) throw new Error('Failed to load news');
+    const news = await res.json();
+    cachedNews = news;
+    renderMarketNews(news);
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><p class="text-rose">Error loading news: ${err.message}</p></div>`;
+  }
+}
+
+function renderMarketNews(news) {
+  const container = document.getElementById('market-news-list');
+  if (!container) return;
+
+  if (!news || news.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No news articles currently stored. Click "Fetch Live News" above.</p></div>';
+    return;
+  }
+
+  container.innerHTML = news.map(item => {
+    const evDate = new Date(item.event_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const impactClass = `badge-impact-${item.impact_category.toLowerCase()}`;
+    const sentimentPill = item.sentiment === 'POSITIVE'
+      ? '<span class="indicator-change-pill up" style="padding: 2px 6px;">Positive</span>'
+      : (item.sentiment === 'NEGATIVE'
+        ? '<span class="indicator-change-pill down" style="padding: 2px 6px;">Negative</span>'
+        : '<span class="indicator-change-pill neutral" style="padding: 2px 6px;">Neutral</span>');
+
+    return `
+      <div class="news-card">
+        <div>
+          <div class="news-card-meta">
+            <span><strong>${item.source}</strong> • ${evDate}</span>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              ${sentimentPill}
+              <span class="badge-impact ${impactClass}">${item.impact_category}</span>
+            </div>
+          </div>
+          <h3 class="news-title">${item.title}</h3>
+          <p class="news-summary">${item.summary}</p>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 0.75rem;">
+          <span class="text-muted">Impact: ${item.severity}</span>
+          ${item.source_url ? `<a href="${item.source_url}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-cyan); text-decoration: none;">Read Report &rarr;</a>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterNewsSearch() {
+  const q = document.getElementById('news-search').value.toLowerCase().trim();
+  if (!q) {
+    renderMarketNews(cachedNews);
+    return;
+  }
+  const filtered = cachedNews.filter(n =>
+    n.title.toLowerCase().includes(q) ||
+    n.summary.toLowerCase().includes(q) ||
+    n.source.toLowerCase().includes(q)
+  );
+  renderMarketNews(filtered);
+}
+
+async function syncMarketNews() {
+  showToast('Fetching latest financial news & analyst reports (FR-008)...');
+  try {
+    const res = await fetch('/api/market-intelligence/news/sync', { method: 'POST' });
+    const data = await res.json();
+    showToast(`Collected ${data.articles_collected || 'latest'} news items!`);
+    loadMarketNews();
+    loadMarketIntelligence();
+  } catch (err) {
+    showToast(`News fetch error: ${err.message}`);
+  }
+}
+
+async function syncAllMarketIntelligence() {
+  const btn = document.getElementById('btn-sync-all-intel');
+  if (btn) btn.disabled = true;
+  showToast('Running comprehensive market intelligence sync (FR-005 to FR-008)...');
+
+  try {
+    await Promise.all([
+      fetch('/api/market-intelligence/indicators/sync', { method: 'POST' }),
+      fetch('/api/market-intelligence/news/sync', { method: 'POST' })
+    ]);
+    showToast('Market intelligence live sync complete!');
+    loadMarketIntelligence();
+  } catch (err) {
+    showToast(`Intel sync error: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// -------------------------------------------------------------
+// FR-009: IMPACT CATEGORY MATRIX & CLASSIFIER SANDBOX
+// -------------------------------------------------------------
+const IMPACT_DESCRIPTIONS = {
+  FINANCIAL: 'Interest rate shifts, inflation, liquidity, treasury yields, banking capital rules, and forex volatility.',
+  REGULATORY: 'Antitrust rulings, disclosure mandates (SEC, EPA, CSDDD), compliance fines, and legal directives.',
+  POLITICAL: 'Elections, government transitions, diplomatic friction, bilateral conflicts, and sovereign policy.',
+  ENVIRONMENTAL: 'Carbon emissions limits, green transition capex, EPA standards, climate disclosure, and weather shocks.',
+  SUPPLY_CHAIN: 'Tariffs, trade restrictions, export controls, port bottlenecks, chip shortages, and shipping disruptions.',
+  COMPETITIVE: 'Hyperscaler rivalry, AI model breakthroughs, disruptive pricing wars, M&A, and market share displacement.'
+};
+
+async function loadImpactMatrix() {
+  const grid = document.getElementById('impact-matrix-grid');
+  if (!grid) return;
+
+  try {
+    const res = await fetch('/api/market-intelligence/impact-matrix');
+    if (!res.ok) throw new Error('Failed to load matrix');
+    const matrix = await res.json();
+
+    const categories = ['FINANCIAL', 'REGULATORY', 'POLITICAL', 'ENVIRONMENTAL', 'SUPPLY_CHAIN', 'COMPETITIVE'];
+
+    grid.innerHTML = categories.map(cat => {
+      const stats = matrix[cat] || { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, TOTAL: 0 };
+      const total = stats.TOTAL || 0;
+      const desc = IMPACT_DESCRIPTIONS[cat] || '';
+
+      const critPct = total ? (stats.CRITICAL / total) * 100 : 0;
+      const highPct = total ? (stats.HIGH / total) * 100 : 0;
+      const medPct = total ? (stats.MEDIUM / total) * 100 : 0;
+      const lowPct = total ? (stats.LOW / total) * 100 : 0;
+
+      return `
+        <div class="impact-category-card">
+          <div class="impact-cat-head">
+            <span class="impact-cat-name">
+              <span class="badge-impact badge-impact-${cat.toLowerCase()}">${cat}</span>
+            </span>
+            <span class="impact-cat-count">${total}</span>
+          </div>
+
+          <p class="impact-cat-desc">${desc}</p>
+
+          <div class="severity-meter-bar">
+            <div class="meter-seg meter-critical" style="width: ${critPct}%" title="Critical: ${stats.CRITICAL}"></div>
+            <div class="meter-seg meter-high" style="width: ${highPct}%" title="High: ${stats.HIGH}"></div>
+            <div class="meter-seg meter-medium" style="width: ${medPct}%" title="Medium: ${stats.MEDIUM}"></div>
+            <div class="meter-seg meter-low" style="width: ${lowPct}%" title="Low: ${stats.LOW}"></div>
+          </div>
+
+          <div class="severity-legend">
+            <span>🔴 Crit: ${stats.CRITICAL}</span>
+            <span>🟠 High: ${stats.HIGH}</span>
+            <span>🔵 Med: ${stats.MEDIUM}</span>
+            <span>⚪ Low: ${stats.LOW}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    grid.innerHTML = `<div class="empty-state"><p class="text-rose">Error loading impact matrix: ${err.message}</p></div>`;
+  }
+}
+
+const SAMPLE_SCENARIOS = {
+  tariff: 'United States Trade Representative announces finalization of 100% tariffs on imported electric vehicles, 50% on solar cells and advanced semiconductors, and 25% on critical battery minerals effective immediately.',
+  export: 'Multilateral export control agreement bars sales of advanced semiconductor manufacturing equipment, gate-all-around EDA software, and sub-3nm chip technologies to foreign foundries.',
+  tax: 'Global minimum corporate tax framework Pillar Two reaches 55 ratifying member states, imposing a 15% top-up tax on multinational tech conglomerates earning over €750M in annual revenue.',
+  fed: 'Federal Reserve Open Market Committee signals neutral interest rate adjustments, holding federal funds rate while 10-year Treasury yield spikes 18 basis points amidst durable goods inflation concerns.',
+  epa: 'Environmental Protection Agency issues binding greenhouse gas emissions limits for fossil-fueled power stations, mandating 90% carbon capture utilization by 2032.',
+  ai: 'Hyperscaler cloud competitors launch next-generation automated reasoning models, slashing cloud token pricing by 65% and sparking widespread enterprise infrastructure displacement.'
+};
+
+function setClassifierSample(type) {
+  const text = SAMPLE_SCENARIOS[type];
+  if (text) {
+    document.getElementById('classifier-input-text').value = text;
+  }
+}
+
+async function runClassifier() {
+  const input = document.getElementById('classifier-input-text').value.trim();
+  const btn = document.getElementById('btn-run-classifier');
+  const card = document.getElementById('classifier-result-card');
+
+  if (!input) {
+    showToast('Please enter text to classify.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Classifying Impact...';
+
+  try {
+    const res = await fetch('/api/market-intelligence/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || 'Classification failed');
+    }
+
+    const data = await res.json();
+    card.classList.remove('hidden');
+
+    const impactClass = `badge-impact-${data.impact_category.toLowerCase()}`;
+    const sevClass = `badge-severity-${data.severity.toLowerCase()}`;
+    const confPct = Math.round(data.confidence_score * 100);
+
+    card.innerHTML = `
+      <div class="classifier-result-header">
+        <div>
+          <span style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">FR-009 Classification Result</span>
+          <div class="classifier-result-title">${data.title}</div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <span class="badge-impact ${impactClass}">${data.impact_category}</span>
+          <span class="badge-severity ${sevClass}">${data.severity}</span>
+        </div>
+      </div>
+
+      <div class="classifier-grid">
+        <div class="classifier-meta-block">
+          <div class="classifier-meta-label">Primary Impact Domain</div>
+          <div class="classifier-meta-val" style="color: var(--accent-purple); font-size: 1.1rem;">${data.impact_category}</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${data.impact_description}</div>
+        </div>
+
+        <div class="classifier-meta-block">
+          <div class="classifier-meta-label">Confidence & Sentiment</div>
+          <div class="classifier-meta-val">${confPct}% Confidence</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Sentiment: <strong>${data.sentiment}</strong></div>
+        </div>
+
+        <div class="classifier-meta-block">
+          <div class="classifier-meta-label">Detected Event Type</div>
+          <div class="classifier-meta-val">${data.detected_event_type.replace('_', ' ')}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Severity: <strong>${data.severity}</strong></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 8px;">Affected Sectors:</span>
+        ${data.affected_sectors.map(s => `<span class="sector-tag" style="margin-right: 4px;">${s}</span>`).join('')}
+        ${data.affected_tickers.length > 0 ? `
+          <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 12px; margin-right: 8px;">Tickers:</span>
+          ${data.affected_tickers.map(t => `<span class="ticker-tag" style="margin-right: 4px;">${t}</span>`).join('')}
+        ` : ''}
+      </div>
+
+      <div class="actions-box">
+        <div class="actions-box-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Automated Risk Mitigation & Recommendations
+        </div>
+        <ul class="actions-list">
+          ${data.suggested_actions.map(a => `<li>${a}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+
+    showToast(`Classified as ${data.impact_category} (${data.severity} Severity)`);
+  } catch (err) {
+    showToast(`Classifier error: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Classify Impact Category (FR-009)';
+  }
+}
+
+// -------------------------------------------------------------
+// EVENT CREATION MODAL (FR-007)
+// -------------------------------------------------------------
+function openCreateEventModal() {
+  document.getElementById('create-event-modal').classList.remove('hidden');
+}
+
+function closeCreateEventModal() {
+  document.getElementById('create-event-modal').classList.add('hidden');
+}
+
+async function submitCreateEvent() {
+  const title = document.getElementById('modal-ev-title').value.trim();
+  const event_type = document.getElementById('modal-ev-type').value;
+  const impact_category = document.getElementById('modal-ev-category').value;
+  const summary = document.getElementById('modal-ev-summary').value.trim();
+  const source = document.getElementById('modal-ev-source').value.trim() || 'Intelligence Network';
+  const source_url = document.getElementById('modal-ev-url').value.trim() || null;
+  const severity = document.getElementById('modal-ev-severity').value;
+  const sectorsRaw = document.getElementById('modal-ev-sectors').value.trim();
+  const tickersRaw = document.getElementById('modal-ev-tickers').value.trim();
+
+  if (!title || !summary) {
+    showToast('Please provide both Title and Summary.');
+    return;
+  }
+
+  const affected_sectors = sectorsRaw ? sectorsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const affected_tickers = tickersRaw ? tickersRaw.split(',').map(t => t.trim().toUpperCase()).filter(Boolean) : [];
+
+  const payload = {
+    title,
+    summary,
+    event_type,
+    impact_category: impact_category || null,
+    severity,
+    sentiment: 'NEUTRAL',
+    source,
+    source_url,
+    affected_sectors,
+    affected_tickers
+  };
+
+  try {
+    const res = await fetch('/api/market-intelligence/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Event creation failed');
+    }
+
+    const created = await res.json();
+    showToast(`Event registered: ${created.title.substring(0, 30)}...`);
+    closeCreateEventModal();
+
+    // Reset form
+    document.getElementById('modal-ev-title').value = '';
+    document.getElementById('modal-ev-summary').value = '';
+    document.getElementById('modal-ev-source').value = '';
+    document.getElementById('modal-ev-url').value = '';
+    document.getElementById('modal-ev-sectors').value = '';
+    document.getElementById('modal-ev-tickers').value = '';
+
+    // Refresh views
+    loadMarketEvents(currentGeoType, currentGeoSeverity);
+    loadImpactMatrix();
+    loadMarketIntelligence();
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  }
 }

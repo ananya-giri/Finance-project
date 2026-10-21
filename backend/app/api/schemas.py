@@ -85,3 +85,81 @@ class SchedulerStatusResponse(BaseModel):
     next_scheduled_run: Optional[str] = None
     monitored_companies_count: int
     recent_audit_logs: List[Dict[str, Any]]
+
+# ============================================================================
+# FR-005 to FR-009: Market Intelligence Schemas
+# ============================================================================
+
+class EconomicIndicatorItem(BaseModel):
+    id: int
+    category: str
+    name: str
+    symbol: str
+    current_value: float
+    previous_value: Optional[float] = None
+    unit: str
+    change_24h: Optional[float] = 0.0
+    change_pct_24h: Optional[float] = 0.0
+    frequency: str
+    source: str
+    historical_sparkline: Optional[str] = None
+    last_updated: datetime
+
+    class Config:
+        from_attributes = True
+
+class MarketEventItem(BaseModel):
+    id: int
+    title: str
+    summary: str
+    event_type: str
+    impact_category: str
+    severity: str
+    sentiment: str
+    confidence_score: float
+    source: str
+    source_url: Optional[str] = None
+    affected_sectors: Optional[str] = "[]"
+    affected_tickers: Optional[str] = "[]"
+    event_date: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CreateMarketEventRequest(BaseModel):
+    title: str
+    summary: str
+    event_type: str = Field(..., description="TARIFF_CHANGE, TRADE_RESTRICTION, SANCTION, IMPORT_EXPORT_CURB, TAX_POLICY, GOVERNMENT_REGULATION, NEWS_ARTICLE, MARKET_REPORT")
+    impact_category: Optional[str] = Field(None, description="FINANCIAL, REGULATORY, POLITICAL, ENVIRONMENTAL, SUPPLY_CHAIN, COMPETITIVE (leave empty for auto-classification)")
+    severity: Optional[str] = "MEDIUM"
+    sentiment: Optional[str] = "NEUTRAL"
+    source: Optional[str] = "Intelligence Network"
+    source_url: Optional[str] = None
+    affected_sectors: Optional[List[str]] = []
+    affected_tickers: Optional[List[str]] = []
+
+class ClassifyEventRequest(BaseModel):
+    text: str = Field(..., description="Headline, policy draft, news article, or regulatory memo")
+
+class ClassifyEventResponse(BaseModel):
+    title: str
+    summary: str
+    detected_event_type: str
+    impact_category: str
+    impact_description: str
+    confidence_score: float
+    severity: str
+    sentiment: str
+    affected_sectors: List[str]
+    affected_tickers: List[str]
+    suggested_actions: List[str]
+
+class MarketIntelligenceDashboardResponse(BaseModel):
+    total_indicators_tracked: int
+    categories_breakdown: Dict[str, int]
+    total_events: int
+    impact_category_distribution: Dict[str, int]
+    severity_distribution: Dict[str, int]
+    latest_critical_events: List[MarketEventItem]
+    continuous_collection_active: bool

@@ -96,11 +96,27 @@ class SchedulerService:
 
     @classmethod
     def _scheduled_poll_job(cls):
-        logger.info("Auto-update check running for tracked companies...")
+        logger.info("Auto-update check running for tracked companies and external market intelligence...")
         cls._last_run = datetime.utcnow()
         db = SessionLocal()
         try:
             cls.run_update_check(db)
+            # FR-005 & FR-008: Continuous External Market Intelligence Collection
+            from backend.app.services.market_intelligence import MarketIntelligenceService
+            MarketIntelligenceService.collect_all_indicators(db)
+            MarketIntelligenceService.collect_live_market_news(db)
+            
+            # Log continuous market intelligence sync
+            log = UpdateLog(
+                ticker="GLOBAL_MACRO",
+                event_type="MARKET_INTELLIGENCE_SYNC",
+                status="SUCCESS",
+                report_type_detected="ECONOMIC_INDICATORS_AND_NEWS",
+                fiscal_period_detected=datetime.utcnow().strftime("%Y-%m-%d"),
+                details="FR-005 & FR-008: Continuous collection of 6 indicator categories and market news completed."
+            )
+            db.add(log)
+            db.commit()
         except Exception as e:
             logger.error(f"Error during scheduled poll: {e}")
         finally:
