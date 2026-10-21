@@ -59,6 +59,15 @@
           <span class="badge badge-fr">FR-004</span>
         </a>
       </div>
+
+      <div class="nav-group">
+        <span class="nav-label">Market Intelligence</span>
+        <a href="#" class="nav-item" data-tab="market-intelligence" id="nav-market-intel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          External Market Intel
+          <span class="badge badge-fr">FR-005–009</span>
+        </a>
+      </div>
     </nav>
 
     <div class="sidebar-footer">
@@ -502,7 +511,344 @@
       </div>
     </section>
 
+    <!-- ===== MARKET INTELLIGENCE TAB (FR-005 to FR-009) ===== -->
+    <section class="tab-panel" id="tab-market-intelligence">
+      <!-- Section 2.2 Header Bar -->
+      <div class="intel-header-banner">
+        <div class="intel-banner-content">
+          <div class="intel-badges-row">
+            <span class="badge badge-fr">FR-005 Continuous Collection</span>
+            <span class="badge badge-fr">FR-006 6 Economic Indicators</span>
+            <span class="badge badge-fr">FR-007 Geopolitical & Regulatory</span>
+            <span class="badge badge-fr">FR-008 News & Reports</span>
+            <span class="badge badge-fr">FR-009 Impact Classification</span>
+          </div>
+          <h2 class="intel-banner-title">External Market Intelligence Engine</h2>
+          <p class="intel-banner-desc">Continuously aggregates macro indicators, geopolitical shifts, regulatory mandates, news feeds, and automatically categorizes event impact into Financial, Regulatory, Political, Environmental, Supply Chain, and Competitive domains.</p>
+        </div>
+        <div class="intel-banner-actions">
+          <button class="btn btn-primary" id="btn-sync-all-intel" onclick="syncAllMarketIntelligence()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Sync Live Intel
+          </button>
+          <button class="btn btn-secondary" onclick="openCreateEventModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Register Event
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Scorecard -->
+      <div class="stats-grid mb-6">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-cyan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Economic Indicators Tracked</span>
+            <span class="stat-value" id="intel-stat-indicators">28</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">Geopolitical & Reg Events</span>
+            <span class="stat-value" id="intel-stat-events">—</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">News & Market Reports</span>
+            <span class="stat-value" id="intel-stat-news">—</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-amber">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">High / Critical Alerts</span>
+            <span class="stat-value" id="intel-stat-alerts">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub Navigation Pills -->
+      <div class="intel-subnav">
+        <button class="intel-subnav-btn active" data-subtab="indicators" onclick="switchIntelSubtab('indicators')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Economic Indicators
+          <span class="subtab-tag">FR-005/006</span>
+        </button>
+        <button class="intel-subnav-btn" data-subtab="geopolitical" onclick="switchIntelSubtab('geopolitical')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Geopolitical & Regulatory
+          <span class="subtab-tag">FR-007</span>
+        </button>
+        <button class="intel-subnav-btn" data-subtab="news" onclick="switchIntelSubtab('news')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1m2 13a2 2 0 0 1-2-2V7m2 13a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/></svg>
+          News & Market Reports
+          <span class="subtab-tag">FR-008</span>
+        </button>
+        <button class="intel-subnav-btn" data-subtab="classifier" onclick="switchIntelSubtab('classifier')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          Impact Matrix & AI Classifier
+          <span class="subtab-tag">FR-009</span>
+        </button>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- SUBVIEW 1: ECONOMIC INDICATORS (FR-005, FR-006) -->
+      <!-- ======================================================== -->
+      <div class="intel-subview active" id="subview-indicators">
+        <div class="card mb-4">
+          <div class="intel-controls-row">
+            <div class="category-pills" id="indicator-category-pills">
+              <button class="cat-pill active" data-cat="ALL" onclick="filterIndicatorsCategory('ALL')">All Categories</button>
+              <button class="cat-pill" data-cat="EXCHANGE_RATE" onclick="filterIndicatorsCategory('EXCHANGE_RATE')">Exchange Rates</button>
+              <button class="cat-pill" data-cat="INFLATION_RATE" onclick="filterIndicatorsCategory('INFLATION_RATE')">Inflation Rates</button>
+              <button class="cat-pill" data-cat="INTEREST_RATE" onclick="filterIndicatorsCategory('INTEREST_RATE')">Interest Rates</button>
+              <button class="cat-pill" data-cat="COMMODITY_PRICE" onclick="filterIndicatorsCategory('COMMODITY_PRICE')">Commodity Prices</button>
+              <button class="cat-pill" data-cat="STOCK_INDEX" onclick="filterIndicatorsCategory('STOCK_INDEX')">Stock Market Indices</button>
+              <button class="cat-pill" data-cat="INDUSTRY_GROWTH" onclick="filterIndicatorsCategory('INDUSTRY_GROWTH')">Industry Growth Rates</button>
+            </div>
+            <div class="intel-search-wrap">
+              <input type="text" id="indicator-search" class="form-input" placeholder="Search indicator, symbol..." oninput="filterIndicatorsSearch()" />
+              <button class="btn btn-secondary" onclick="syncIndicators()" title="Collect live quotes">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Sync Indicators
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="indicators-grid" id="indicators-grid">
+          <div class="loading-state">
+            <div class="spinner"></div> Loading economic indicators...
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- SUBVIEW 2: GEOPOLITICAL & REGULATORY (FR-007) -->
+      <!-- ======================================================== -->
+      <div class="intel-subview" id="subview-geopolitical">
+        <div class="card mb-4">
+          <div class="intel-controls-row">
+            <div class="category-pills" id="geo-type-pills">
+              <button class="cat-pill active" data-type="ALL" onclick="filterGeoType('ALL')">All Types</button>
+              <button class="cat-pill" data-type="TARIFF_CHANGE" onclick="filterGeoType('TARIFF_CHANGE')">Tariff Changes</button>
+              <button class="cat-pill" data-type="TRADE_RESTRICTION" onclick="filterGeoType('TRADE_RESTRICTION')">Trade Restrictions</button>
+              <button class="cat-pill" data-type="SANCTION" onclick="filterGeoType('SANCTION')">Sanctions</button>
+              <button class="cat-pill" data-type="IMPORT_EXPORT_CURB" onclick="filterGeoType('IMPORT_EXPORT_CURB')">Import/Export Curbs</button>
+              <button class="cat-pill" data-type="TAX_POLICY" onclick="filterGeoType('TAX_POLICY')">Tax Policy Changes</button>
+              <button class="cat-pill" data-type="GOVERNMENT_REGULATION" onclick="filterGeoType('GOVERNMENT_REGULATION')">Government Regulations</button>
+            </div>
+            <div class="intel-search-wrap">
+              <select id="geo-severity-filter" class="form-select" onchange="filterGeoSeverity(this.value)">
+                <option value="ALL">All Severities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+              <button class="btn btn-primary" onclick="openCreateEventModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Event
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="events-feed" id="geopolitical-events-list">
+          <div class="loading-state">
+            <div class="spinner"></div> Loading geopolitical & regulatory events...
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- SUBVIEW 3: NEWS & MARKET REPORTS (FR-008) -->
+      <!-- ======================================================== -->
+      <div class="intel-subview" id="subview-news">
+        <div class="card mb-4">
+          <div class="intel-controls-row">
+            <div class="news-filter-info">
+              <span class="info-badge">FR-008 Live Stream</span>
+              <span class="text-muted">Real-time news articles, macro studies, and sector analyst reports.</span>
+            </div>
+            <div class="intel-search-wrap">
+              <input type="text" id="news-search" class="form-input" placeholder="Search news headlines..." oninput="filterNewsSearch()" />
+              <button class="btn btn-secondary" onclick="syncMarketNews()" title="Fetch fresh news from financial wire">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Fetch Live News
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="news-grid" id="market-news-list">
+          <div class="loading-state">
+            <div class="spinner"></div> Loading financial news and market reports...
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- SUBVIEW 4: IMPACT MATRIX & AI CLASSIFIER (FR-009) -->
+      <!-- ======================================================== -->
+      <div class="intel-subview" id="subview-classifier">
+        <!-- Impact Matrix Grid -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">FR-009: Impact Category Distribution Matrix</h2>
+              <p class="card-subtitle">Automatic classification of external events across 6 distinct impact categories.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadImpactMatrix()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Refresh Matrix
+            </button>
+          </div>
+          <div class="impact-categories-grid" id="impact-matrix-grid">
+            <!-- Dynamically populated 6 category cards -->
+          </div>
+        </div>
+
+        <!-- Interactive Event Classifier Sandbox -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                FR-009 Event Impact Classifier Sandbox
+              </h2>
+              <p class="card-subtitle">Paste any real-world headline, policy announcement, tariff schedule, or regulatory mandate to classify it instantly.</p>
+            </div>
+          </div>
+
+          <div class="classifier-sandbox-body">
+            <!-- Sample Prompts -->
+            <div class="sample-prompts-bar">
+              <span class="sample-prompt-label">Quick Scenarios:</span>
+              <button class="sample-chip" onclick="setClassifierSample('tariff')">100% EV Tariff Increase</button>
+              <button class="sample-chip" onclick="setClassifierSample('export')">Sub-3nm Chip Export Ban</button>
+              <button class="sample-chip" onclick="setClassifierSample('tax')">OECD 15% Minimum Tax</button>
+              <button class="sample-chip" onclick="setClassifierSample('fed')">Fed Rates & Treasury Yield</button>
+              <button class="sample-chip" onclick="setClassifierSample('epa')">EPA Carbon Emission Rules</button>
+              <button class="sample-chip" onclick="setClassifierSample('ai')">Hyperscaler AI Model Disruption</button>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="classifier-input-text">Input External Event Text / Regulatory Memo</label>
+              <textarea id="classifier-input-text" class="form-input form-textarea" rows="4" placeholder="Enter headline or summary text, e.g.: 'European Commission issues directive enforcing mandatory supply chain due diligence audits with fines up to 5% of global turnover...'"></textarea>
+            </div>
+
+            <div class="classifier-actions">
+              <button class="btn btn-primary" id="btn-run-classifier" onclick="runClassifier()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Classify Impact Category (FR-009)
+              </button>
+              <button class="btn btn-secondary" onclick="document.getElementById('classifier-input-text').value = ''; document.getElementById('classifier-result-card').classList.add('hidden')">
+                Clear
+              </button>
+            </div>
+
+            <!-- Dynamic Result Card -->
+            <div id="classifier-result-card" class="classifier-result-card hidden">
+              <!-- Dynamically rendered result -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
+
+  <!-- Modal for Creating / Registering a Market Event (FR-007) -->
+  <div class="modal-overlay hidden" id="create-event-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Register Market Intelligence Event</h3>
+        <button class="modal-close" onclick="closeCreateEventModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="modal-ev-title">Event Title *</label>
+          <input type="text" id="modal-ev-title" class="form-input" placeholder="e.g. US Increases Tariffs on Critical Battery Materials to 25%" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-type">Event Type (FR-007/008) *</label>
+            <select id="modal-ev-type" class="form-select">
+              <option value="TARIFF_CHANGE">Tariff Changes</option>
+              <option value="TRADE_RESTRICTION">Trade Restrictions</option>
+              <option value="SANCTION">Sanctions</option>
+              <option value="IMPORT_EXPORT_CURB">Import/Export Curbs</option>
+              <option value="TAX_POLICY">Tax Policy Changes</option>
+              <option value="GOVERNMENT_REGULATION">Government Regulations</option>
+              <option value="NEWS_ARTICLE">News Article</option>
+              <option value="MARKET_REPORT">Market Report</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-category">Impact Category (FR-009)</label>
+            <select id="modal-ev-category" class="form-select">
+              <option value="">Auto-Classify (Recommended)</option>
+              <option value="FINANCIAL">Financial</option>
+              <option value="REGULATORY">Regulatory</option>
+              <option value="POLITICAL">Political</option>
+              <option value="ENVIRONMENTAL">Environmental</option>
+              <option value="SUPPLY_CHAIN">Supply Chain</option>
+              <option value="COMPETITIVE">Competitive</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-ev-summary">Summary & Intelligence Details *</label>
+          <textarea id="modal-ev-summary" class="form-input form-textarea" rows="3" placeholder="Provide full details, policy directives, or reporting notes..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-source">Source Name</label>
+            <input type="text" id="modal-ev-source" class="form-input" placeholder="e.g. Federal Register / Financial Times" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-url">Source URL (optional)</label>
+            <input type="url" id="modal-ev-url" class="form-input" placeholder="https://..." />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-severity">Severity Rating</label>
+            <select id="modal-ev-severity" class="form-select">
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="LOW">Low</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-ev-sectors">Affected Sectors (comma-separated)</label>
+            <input type="text" id="modal-ev-sectors" class="form-input" placeholder="e.g. Technology, Automotive" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-ev-tickers">Affected Tickers (comma-separated)</label>
+          <input type="text" id="modal-ev-tickers" class="form-input" placeholder="e.g. TSLA, NVDA" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCreateEventModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateEvent()">Register & Ingest Event</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification -->
   <div class="toast-container" id="toast-container"></div>

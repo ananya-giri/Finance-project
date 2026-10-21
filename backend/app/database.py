@@ -26,6 +26,7 @@ def init_db():
         financial_statement,
         structured_metrics,
         unstructured_doc,
-        update_log
+        update_log,
+        market_intelligence
     )
     Base.metadata.create_all(bind=engine)

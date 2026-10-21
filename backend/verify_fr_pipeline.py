@@ -92,9 +92,84 @@ def run_verification():
         print(f"Scheduler Status: {status['monitored_companies_count']} monitored companies, {len(status['recent_audit_logs'])} audit logs.")
         print("[PASS] FR-004 PASSED")
 
-        print("\n==========================================")
-        print("ALL REQUIREMENTS FR-001 TO FR-004 VERIFIED!")
-        print("==========================================")
+        # 5. FR-005 & FR-006 External Economic Indicators
+        print("\n=== Step 6: Testing FR-005 & FR-006 (External Economic Indicators Collection) ===")
+        from backend.app.services.market_intelligence import MarketIntelligenceService
+        from backend.app.models.market_intelligence import EconomicIndicator, MarketIntelligenceEvent
+
+        ind_res = MarketIntelligenceService.collect_all_indicators(db)
+        print(f"Indicators Collection Result: {ind_res}")
+        
+        indicators = db.query(EconomicIndicator).all()
+        categories_found = {ind.category for ind in indicators}
+        print(f"Total Indicators Tracked: {len(indicators)}")
+        print(f"Categories Found: {categories_found}")
+
+        required_categories = {
+            "EXCHANGE_RATE",
+            "INFLATION_RATE",
+            "INTEREST_RATE",
+            "COMMODITY_PRICE",
+            "STOCK_INDEX",
+            "INDUSTRY_GROWTH"
+        }
+        assert required_categories.issubset(categories_found), f"Missing categories: {required_categories - categories_found}"
+        assert len(indicators) >= 20, "Should have tracked at least 20 indicators across the 6 categories"
+        print("[PASS] FR-005 & FR-006 PASSED: All 6 economic indicator categories verified!")
+
+        # 6. FR-007 Geopolitical & Regulatory Events
+        print("\n=== Step 7: Testing FR-007 (Geopolitical & Regulatory Events Collection) ===")
+        MarketIntelligenceService.seed_initial_events_if_empty(db)
+        geo_types = [
+            "TARIFF_CHANGE",
+            "TRADE_RESTRICTION",
+            "SANCTION",
+            "IMPORT_EXPORT_CURB",
+            "TAX_POLICY",
+            "GOVERNMENT_REGULATION"
+        ]
+        found_types = set()
+        for gt in geo_types:
+            ev = db.query(MarketIntelligenceEvent).filter(MarketIntelligenceEvent.event_type == gt).first()
+            if ev:
+                found_types.add(gt)
+                print(f"  - [{gt}] {ev.title} (Severity: {ev.severity})")
+        assert len(found_types) == len(geo_types), f"Missing event types: {set(geo_types) - found_types}"
+        print("[PASS] FR-007 PASSED: Tariff Changes, Trade Restrictions, Sanctions, Curbs, Tax Policy, and Regulations verified!")
+
+        # 7. FR-008 News Articles & Market Reports
+        print("\n=== Step 8: Testing FR-008 (News Articles & Market Reports Collection) ===")
+        news_reports = db.query(MarketIntelligenceEvent).filter(
+            MarketIntelligenceEvent.event_type.in_(["NEWS_ARTICLE", "MARKET_REPORT"])
+        ).all()
+        print(f"Total News Articles & Market Reports: {len(news_reports)}")
+        for nr in news_reports[:3]:
+            print(f"  - [{nr.event_type}] {nr.title} ({nr.source})")
+        assert len(news_reports) > 0, "Should have news articles or market reports collected"
+        print("[PASS] FR-008 PASSED: News Articles and Market Reports verified!")
+
+        # 8. FR-009 Event Impact Classification
+        print("\n=== Step 9: Testing FR-009 (Impact Category Classification Engine) ===")
+        test_cases = [
+            ("Federal Reserve unexpected 50bps rate cut shifts sovereign bond yields and liquidity", "FINANCIAL"),
+            ("SEC approves mandatory climate-related disclosure and greenhouse gas audit regulations", "REGULATORY"),
+            ("Bilateral summit between sovereign nations triggers diplomatic friction and sanctions discussion", "POLITICAL"),
+            ("EPA finalizes strict carbon emission cap for coal-fired power facilities under clean air rules", "ENVIRONMENTAL"),
+            ("Maritime shipping bottleneck and port container backlogs delay semiconductor raw materials", "SUPPLY_CHAIN"),
+            ("Hyperscaler competitor launches open-weights enterprise foundation model slashing cloud prices", "COMPETITIVE")
+        ]
+
+        for text, expected_cat in test_cases:
+            res = MarketIntelligenceService.classify_external_event(text)
+            print(f"  • Input: \"{text[:45]}...\"")
+            print(f"    Classified Impact: {res['impact_category']} | Severity: {res['severity']} | Confidence: {res['confidence_score']:.2f}")
+            assert res['impact_category'] == expected_cat, f"Expected {expected_cat}, got {res['impact_category']}"
+
+        print("[PASS] FR-009 PASSED: All 6 impact categories (Financial, Regulatory, Political, Environmental, Supply Chain, Competitive) verified!")
+
+        print("\n========================================================")
+        print("ALL REQUIREMENTS FR-001 TO FR-009 SUCCESSFULLY VERIFIED!")
+        print("========================================================")
 
     finally:
         db.close()

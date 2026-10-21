@@ -1,0 +1,24 @@
+CONFERENCE CALL TRANSCRIPT
+Company: Apex Financial Systems Inc. (APEX)
+Quarter: Q3 Fiscal Year 2025
+Date: October 15, 2025
+
+Executives Present:
+- John Vance, Chief Executive Officer
+- Sarah Sterling, Chief Financial Officer
+- Mark Rodriguez, Head of Investor Relations
+
+[Operator]
+Good afternoon, and welcome to Apex Financial Systems Third Quarter 2025 Earnings Conference Call. All lines are in a listen-only mode. Later, we will conduct a question-and-answer session.
+
+[Sarah Sterling - CFO]
+Thank you, operator. Total revenue for the third quarter rose 14% year-over-year to $4.85 billion, driven by robust recurring enterprise subscription growth and high margin cloud analytics solutions. Operating income stood at $1.45 billion, delivering an operating margin of 29.9%, up 120 basis points compared to the prior-year period. Net profit reached $1.18 billion, with diluted EPS of $1.42. 
+
+Our cash flow from operations remained exceptional at $1.62 billion, generating free cash flow of $1.39 billion after CapEx investments into our distributed AI infrastructure. Our balance sheet remains rock-solid with $6.2 billion in cash and marketable securities and a debt-to-assets ratio of 0.24.
+
+[John Vance - CEO]
+We are witnessing accelerated demand across global commercial banking and institutional asset management. Clients are adopting our autonomous financial intelligence modules to mitigate geopolitical volatility and optimize liquidity across international corridors.
+
+[Q&A Session]
+Analyst (Goldman Sachs): Could you elaborate on your outlook for operating margins heading into Q4 given rising talent and AI compute costs?
+Sarah Sterling: We expect our operating margin to remain well-supported in the 29% to 31% range, as automated workflows drive operating leverage.
