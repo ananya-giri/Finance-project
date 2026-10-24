@@ -163,3 +163,103 @@ class MarketIntelligenceDashboardResponse(BaseModel):
     severity_distribution: Dict[str, int]
     latest_critical_events: List[MarketEventItem]
     continuous_collection_active: bool
+
+# ============================================================================
+# FR-010 to FR-014: Knowledge Management & RAG Schemas
+# ============================================================================
+
+class RAGSearchRequest(BaseModel):
+    query: str = Field(..., description="Semantic search query or question")
+    ticker: Optional[str] = Field(None, description="Filter by company ticker (e.g. AAPL)")
+    doc_type: Optional[str] = Field(None, description="Filter by document type (e.g. EARNINGS_CALL_TRANSCRIPT, BALANCE_SHEET)")
+    fiscal_period: Optional[str] = Field(None, description="Filter by fiscal period (e.g. 2024-FY, 2024-Q4)")
+    industry: Optional[str] = Field(None, description="Filter by company industry")
+    geography: Optional[str] = Field(None, description="Filter by geography/country")
+    min_confidence: Optional[float] = Field(None, description="Minimum metadata confidence score (0.0 - 1.0)")
+    min_similarity: Optional[float] = Field(0.35, description="Minimum cosine similarity threshold (default 0.35)")
+    top_k: Optional[int] = Field(5, description="Maximum number of distinct evidence passages")
+
+class EvidenceItem(BaseModel):
+    chunk_id: int
+    document_id: int
+    title: str
+    file_name: str
+    ticker: str
+    doc_type: str
+    fiscal_period: Optional[str] = None
+    chunk_index: int
+    text: str
+    similarity_score: float
+    metadata: Dict[str, Any]
+
+class RAGSearchResponse(BaseModel):
+    query: str
+    results_count: int
+    distinct_documents_count: int
+    evidence: List[EvidenceItem]
+
+class CitationItem(BaseModel):
+    citation_id: str
+    document_id: int
+    title: str
+    file_name: str
+    ticker: str
+    doc_type: str
+    fiscal_period: Optional[str] = None
+    chunk_index: int
+    similarity_score: float
+    confidence_score: float
+    excerpt: str
+
+class RAGRecommendRequest(BaseModel):
+    query: str = Field(..., description="Financial question or analysis prompt to evaluate")
+    ticker: Optional[str] = Field(None, description="Target company ticker (optional)")
+    doc_type: Optional[str] = Field(None, description="Target document type filter")
+    fiscal_period: Optional[str] = Field(None, description="Target fiscal period filter")
+    industry: Optional[str] = Field(None, description="Target industry filter")
+    geography: Optional[str] = Field(None, description="Target geography filter")
+    min_confidence: Optional[float] = Field(None, description="Minimum metadata confidence score (0.0 - 1.0)")
+    min_similarity: Optional[float] = Field(0.68, description="Minimum cosine similarity threshold for grounded evidence (default 0.68)")
+    top_k: Optional[int] = Field(4, description="Maximum evidence items to synthesize")
+
+class RAGRecommendResponse(BaseModel):
+    status: str
+    query: str
+    target_ticker: Optional[str] = None
+    recommendation: str
+    key_findings: List[str]
+    grounded: bool
+    citations: List[CitationItem]
+    evidence_count: int
+    average_similarity: float
+    insufficient_evidence_reason: Optional[str] = None
+
+class RAGStatusResponse(BaseModel):
+    status: str
+    embedding_model: str
+    vector_dimension: int
+    total_documents_count: int
+    indexed_documents_count: int
+    total_chunks_stored: int
+    indexed_tickers: List[str]
+    persistence_type: str
+
+class RAGIndexDetailItem(BaseModel):
+    status: str
+    document_id: int
+    ticker: Optional[str] = None
+    title: Optional[str] = None
+    chunks_count: Optional[int] = 0
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+class RAGIndexAllResponse(BaseModel):
+    status: str
+    message: str
+    total_documents: int
+    newly_indexed: int
+    unchanged_count: int
+    skipped_count: int
+    failed_count: int
+    total_chunks_stored: int
+    details: List[RAGIndexDetailItem]

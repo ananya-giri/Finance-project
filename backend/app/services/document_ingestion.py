@@ -169,6 +169,20 @@ class DocumentIngestionService:
         db.commit()
         db.refresh(unstructured_doc)
 
+        # 6. Automatic FR-010 Vector Indexing into Persistent Vector Storage
+        chunks_indexed = 0
+        try:
+            from backend.app.services.rag_service import RAGService
+            rag_res = RAGService.index_document(
+                db=db,
+                document_id=unstructured_doc.id,
+                text=extracted_text,
+                metadata=metadata
+            )
+            chunks_indexed = rag_res.get("chunks_count", 0)
+        except Exception as e:
+            logger.warning(f"Auto vector indexing for doc #{unstructured_doc.id} deferred: {e}")
+
         return {
             "status": "SUCCESS",
             "document_id": unstructured_doc.id,
@@ -180,8 +194,10 @@ class DocumentIngestionService:
             "file_size": file_size,
             "text_length": len(extracted_text),
             "metrics_updated": metrics_updated,
+            "chunks_indexed": chunks_indexed,
             "content_snippet": snippet[:300] + "..." if len(snippet) > 300 else snippet
         }
+
 
     @staticmethod
     def _extract_text_from_pdf(path: Path) -> str:
