@@ -26,6 +26,7 @@ def init_db():
         financial_statement,
         structured_metrics,
         unstructured_doc,
+        document_chunk,
         update_log,
         market_intelligence
     )

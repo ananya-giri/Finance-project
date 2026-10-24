@@ -1,21 +1,71 @@
 import os
 import sys
+import shutil
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 # Add project root to sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.app.database import SessionLocal, init_db
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from backend.app.database import Base, init_db
 from backend.app.services.historical_ingestion import HistoricalIngestionService
 from backend.app.services.document_ingestion import DocumentIngestionService
 from backend.app.services.metrics_engine import MetricsEngine
 from backend.app.services.scheduler_service import SchedulerService
 
-def run_verification():
-    print("=== Step 1: Initializing Database ===")
-    init_db()
-    db = SessionLocal()
+@contextmanager
+def isolated_test_context():
+    """
+    Creates an isolated temporary SQLite database and temporary upload directory.
+    Never modifies data/fintech.db or data/uploads/.
+    Disposes test engine cleanly for Windows file lock release.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        temp_db_path = temp_dir_path / "temp_fintech.db"
+        temp_upload_dir = temp_dir_path / "uploads"
+        temp_upload_dir.mkdir(parents=True, exist_ok=True)
 
+        prod_db = PROJECT_ROOT / "data" / "fintech.db"
+        if prod_db.exists():
+            shutil.copy2(prod_db, temp_db_path)
+
+        test_engine = create_engine(
+            f"sqlite:///{temp_db_path}",
+            connect_args={"check_same_thread": False}
+        )
+        Base.metadata.create_all(bind=test_engine)
+        TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+        test_db = TestSession()
+
+        import backend.app.config
+        import backend.app.services.document_ingestion
+        import backend.app.services.rag_service
+        orig_upload_dir = backend.app.config.UPLOAD_DIR
+        backend.app.config.UPLOAD_DIR = temp_upload_dir
+        backend.app.services.document_ingestion.UPLOAD_DIR = temp_upload_dir
+        backend.app.services.rag_service.UPLOAD_DIR = temp_upload_dir
+
+        try:
+            yield test_db
+        finally:
+            test_db.close()
+            test_engine.dispose()
+            backend.app.config.UPLOAD_DIR = orig_upload_dir
+            backend.app.services.document_ingestion.UPLOAD_DIR = orig_upload_dir
+            backend.app.services.rag_service.UPLOAD_DIR = orig_upload_dir
+
+def run_verification(db=None):
+    if db is None:
+        with isolated_test_context() as isolated_db:
+            return run_verification(db=isolated_db)
+
+    print("=== Step 1: Initializing Database ===")
     try:
         # 1. FR-001 Ingestion
         print("\n=== Step 2: Testing FR-001 (5-Year Historical Ingestion) for AAPL ===")
@@ -28,19 +78,19 @@ def run_verification():
 
         # 2. FR-002 Document Ingestion
         print("\n=== Step 3: Testing FR-002 (Document Ingestion) ===")
-        # Test 1: Earnings Call Transcript
+        # Test 1: Earnings Call Transcript (Accurate APEX Metadata for APEX sample file)
         transcript_path = Path("sample_data/sample_earnings_transcript.txt")
         if transcript_path.exists():
             with open(transcript_path, "rb") as f:
                 bytes_content = f.read()
             doc_res = DocumentIngestionService.ingest_document(
                 db=db,
-                ticker="AAPL",
+                ticker="APEX",
                 doc_type="EARNINGS_CALL_TRANSCRIPT",
-                title="Apple Q4 FY24 Earnings Conference Call",
+                title="Apex Financial Systems Q3 FY25 Earnings Call",
                 file_bytes=bytes_content,
                 original_filename="sample_earnings_transcript.txt",
-                fiscal_period="2024-Q4",
+                fiscal_period="2025-Q3",
                 period_type="QUARTERLY"
             )
             print(f"FR-002 Transcript Result: {doc_res['title']} (ID: {doc_res['document_id']})")
@@ -67,7 +117,9 @@ def run_verification():
         print("\n=== Step 4: Testing FR-003 (Structured Financial Metrics) ===")
         metrics = MetricsEngine.get_metrics_timeline(db, "AAPL", "ANNUAL")
         print(f"Retrieved {len(metrics)} annual periods of metrics for AAPL.")
-        sample = metrics[-1]
+        metrics_with_rev = [m for m in metrics if m.get("revenue") is not None]
+        sample = metrics_with_rev[-1] if metrics_with_rev else metrics[-1]
+
         print(f"Latest Period ({sample['fiscal_period']}) Metrics:")
         print(f"  - Revenue: {sample['revenue']}")
         print(f"  - EBITDA: {sample['ebitda']}")

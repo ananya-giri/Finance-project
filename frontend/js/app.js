@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkApiHealth();
   loadDashboard();
   loadSchedulerStatus();
+  loadRagStatus();
 });
 
 // Navigation Handling
@@ -73,7 +74,8 @@ function switchTab(tabId) {
     documents: { title: 'Document Upload', sub: 'FR-002: Statements, Presentations & Transcripts' },
     metrics: { title: 'Financial Metrics', sub: 'FR-003: 10 Core Structured Financial Metrics' },
     scheduler: { title: 'Auto-Monitoring', sub: 'FR-004: Automated Report & Statement Watcher' },
-    'market-intelligence': { title: 'External Market Intelligence', sub: 'FR-005 to FR-009: Macro Indicators, Geopolitics, Regulations, News & Impact Classifier' }
+    'market-intelligence': { title: 'External Market Intelligence', sub: 'FR-005 to FR-009: Macro Indicators, Geopolitics, Regulations, News & Impact Classifier' },
+    rag: { title: 'Knowledge Base & RAG', sub: 'FR-010 to FR-014: Persistent Vector Storage, Semantic Search & Grounded Recommendations' }
   };
 
   if (titles[tabId]) {
@@ -86,7 +88,9 @@ function switchTab(tabId) {
   if (tabId === 'documents') loadDocuments();
   if (tabId === 'scheduler') loadSchedulerStatus();
   if (tabId === 'market-intelligence') loadMarketIntelligence();
+  if (tabId === 'rag') loadRagStatus();
 }
+
 
 // Check Health
 async function checkApiHealth() {
@@ -1299,5 +1303,370 @@ async function submitCreateEvent() {
     loadMarketIntelligence();
   } catch (err) {
     showToast(`Error: ${err.message}`);
+  }
+}
+
+// ============================================================================
+// FUNCTION 2.3: KNOWLEDGE MANAGEMENT & RAG (FR-010 to FR-014)
+// ============================================================================
+
+async function loadRagStatus() {
+  try {
+    const res = await fetch('/api/rag/status');
+    if (!res.ok) throw new Error('Failed to fetch RAG status');
+    const data = await res.json();
+
+    const statDocs = document.getElementById('rag-stat-docs');
+    const statChunks = document.getElementById('rag-stat-chunks');
+    if (statDocs) statDocs.textContent = `${data.indexed_documents_count} / ${data.total_documents_count}`;
+    if (statChunks) statChunks.textContent = data.total_chunks_stored;
+
+    // Populate Ticker Filter dropdowns if companies or indexed tickers exist
+    const tickerFilter = document.getElementById('rag-filter-ticker');
+    const recomTicker = document.getElementById('rag-recom-ticker');
+
+    // Fetch tracked companies if not already loaded
+    if (companiesData.length === 0) {
+      const compRes = await fetch('/api/companies');
+      if (compRes.ok) companiesData = await compRes.json();
+    }
+
+    const allTickers = Array.from(new Set([
+      ...companiesData.map(c => c && c.ticker).filter(Boolean),
+      ...(data.indexed_tickers || []).filter(Boolean)
+    ])).sort();
+
+    if (tickerFilter) {
+      const currentFilterVal = tickerFilter.value;
+      tickerFilter.innerHTML = '<option value="ALL">All Companies</option>' +
+        allTickers.map(t => `<option value="${t}" ${t === currentFilterVal ? 'selected' : ''}>${t}</option>`).join('');
+    }
+
+    if (recomTicker) {
+      const currentRecomVal = recomTicker.value;
+      recomTicker.innerHTML = '<option value="ALL">Auto-Detect from Query</option>' +
+        allTickers.map(t => `<option value="${t}" ${t === currentRecomVal ? 'selected' : ''}>${t}</option>`).join('');
+    }
+  } catch (err) {
+    console.error('loadRagStatus error:', err);
+  }
+}
+
+let isSyncingRagDocs = false;
+
+async function syncAllRagDocs() {
+  if (isSyncingRagDocs) return;
+
+  const btn = document.getElementById('btn-sync-all-rag');
+  const feedback = document.getElementById('rag-index-feedback');
+
+  isSyncingRagDocs = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Indexing Documents...';
+  }
+
+  if (feedback) {
+    feedback.classList.remove('hidden');
+    feedback.className = 'rag-feedback-banner loading';
+    feedback.innerHTML = `
+      <div class="rag-feedback-header">
+        <div class="rag-feedback-title">
+          <div class="spinner"></div>
+          <span>Synchronizing Knowledge Base Vector Store (FR-010)</span>
+        </div>
+        <span class="rag-stat-pill">Model: <strong>BAAI/bge-small-en-v1.5</strong></span>
+      </div>
+      <div class="rag-feedback-message">
+        Examining unstructured documents, computing SHA-256 hashes, generating sentence-boundary semantic chunks, and verifying embeddings...
+      </div>
+    `;
+  }
+
+  try {
+    const res = await fetch('/api/rag/index-all', { method: 'POST' });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      throw new Error(`Server returned non-JSON response (${res.status} ${res.statusText})`);
+    }
+
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || `HTTP ${res.status} ${res.statusText}`);
+    }
+
+    const isAllUpToDate = data.status === 'UP_TO_DATE' || (data.newly_indexed === 0 && data.failed_count === 0);
+
+    if (feedback) {
+      if (isAllUpToDate) {
+        feedback.className = 'rag-feedback-banner up-to-date';
+        feedback.innerHTML = `
+          <div class="rag-feedback-header">
+            <div class="rag-feedback-title" style="color: #34d399;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>All Documents Verified & Up to Date (FR-010)</span>
+            </div>
+            <span class="rag-stat-pill" style="border-color: rgba(16,185,129,0.35); color:#34d399;">SHA-256 Verified</span>
+          </div>
+          <div class="rag-feedback-message">
+            ${data.message || `All ${data.total_documents} documents in the knowledge base match their persistent vector signatures. No new indexing was necessary.`}
+          </div>
+          <div class="rag-feedback-stats">
+            <span class="rag-stat-pill">Examined: <strong>${data.total_documents}</strong></span>
+            <span class="rag-stat-pill">Newly Indexed: <strong>0</strong></span>
+            <span class="rag-stat-pill">Unchanged: <strong>${data.unchanged_count}</strong></span>
+            <span class="rag-stat-pill">Failures: <strong>${data.failed_count || 0}</strong></span>
+            <span class="rag-stat-pill">Total Persistent Chunks: <strong>${data.total_chunks_stored}</strong></span>
+          </div>
+        `;
+        showToast(`Vector store up to date: all ${data.total_documents} documents verified (${data.total_chunks_stored} chunks).`);
+      } else {
+        feedback.className = 'rag-feedback-banner success';
+        feedback.innerHTML = `
+          <div class="rag-feedback-header">
+            <div class="rag-feedback-title" style="color: #10b981;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>Vector Indexing Completed (FR-010)</span>
+            </div>
+            <span class="rag-stat-pill" style="border-color: rgba(16,185,129,0.45); color:#6ee7b7;">Indexed</span>
+          </div>
+          <div class="rag-feedback-message">
+            ${data.message || `Successfully indexed ${data.newly_indexed} document(s) into persistent vector storage.`}
+          </div>
+          <div class="rag-feedback-stats">
+            <span class="rag-stat-pill">Examined: <strong>${data.total_documents}</strong></span>
+            <span class="rag-stat-pill">Newly Indexed: <strong>${data.newly_indexed}</strong></span>
+            <span class="rag-stat-pill">Unchanged: <strong>${data.unchanged_count}</strong></span>
+            <span class="rag-stat-pill">Failures: <strong>${data.failed_count || 0}</strong></span>
+            <span class="rag-stat-pill">Total Persistent Chunks: <strong>${data.total_chunks_stored}</strong></span>
+          </div>
+        `;
+        showToast(`Indexed ${data.newly_indexed} document(s) into ${data.total_chunks_stored} persistent vector chunks.`);
+      }
+    }
+
+    await loadRagStatus();
+  } catch (err) {
+    if (feedback) {
+      feedback.className = 'rag-feedback-banner error';
+      feedback.innerHTML = `
+        <div class="rag-feedback-header">
+          <div class="rag-feedback-title" style="color: #f43f5e;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>FR-010 Indexing Failed</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="syncAllRagDocs()" style="font-size:0.75rem; padding:3px 8px;">Retry</button>
+        </div>
+        <div class="rag-feedback-message">
+          ${err.message}
+        </div>
+      `;
+    }
+    showToast(`Indexing error: ${err.message}`);
+  } finally {
+    isSyncingRagDocs = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        Index All Documents (FR-010)
+      `;
+    }
+  }
+}
+
+async function runSemanticSearch() {
+  const query = document.getElementById('rag-search-query').value.trim();
+  const ticker = document.getElementById('rag-filter-ticker').value;
+  const docType = document.getElementById('rag-filter-doctype').value;
+  const industry = document.getElementById('rag-filter-industry').value.trim();
+  const geography = document.getElementById('rag-filter-geography').value.trim();
+  const minSim = parseFloat(document.getElementById('rag-filter-similarity').value) || 0.35;
+  const minConf = parseFloat(document.getElementById('rag-filter-confidence').value) || null;
+
+  const btn = document.getElementById('btn-run-rag-search');
+  const resultsContainer = document.getElementById('rag-search-results');
+  const summaryBox = document.getElementById('rag-search-summary');
+
+  if (!query) {
+    showToast('Please enter a semantic search query or financial question');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Searching...';
+  resultsContainer.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Scanning 384-dimensional persistent vector space...</p></div>';
+
+  try {
+    const payload = {
+      query,
+      ticker: ticker !== 'ALL' ? ticker : null,
+      doc_type: docType !== 'ALL' ? docType : null,
+      industry: industry || null,
+      geography: geography || null,
+      min_confidence: minConf,
+      min_similarity: minSim,
+      top_k: 6
+    };
+
+    const res = await fetch('/api/rag/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Search failed');
+
+    summaryBox.classList.remove('hidden');
+    summaryBox.innerHTML = `Found <strong>${data.results_count}</strong> distinct evidence chunks across <strong>${data.distinct_documents_count}</strong> documents (Relevance ≥ ${(minSim * 100).toFixed(0)}%).`;
+
+    if (data.results_count === 0) {
+      resultsContainer.innerHTML = `
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <p>No distinct evidence passages matched query and active metadata filters.</p>
+          <span style="font-size:0.75rem; color:var(--text-muted);">Try lowering the Min Similarity threshold or clearing metadata filters.</span>
+        </div>`;
+      return;
+    }
+
+    resultsContainer.innerHTML = data.evidence.map((ev, idx) => `
+      <div class="evidence-item-card">
+        <div class="evidence-top">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="ticker-tag">${ev.ticker}</span>
+            <span class="provenance-tag">${ev.doc_type}</span>
+            <span style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">${ev.title}</span>
+          </div>
+          <div class="similarity-badge">
+            ${(ev.similarity_score * 100).toFixed(1)}% Sim
+          </div>
+        </div>
+        <div class="evidence-text">
+          "${ev.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+        </div>
+        <div class="evidence-meta-footer">
+          <span><strong>Source:</strong> ${ev.file_name}</span>
+          <span><strong>Period:</strong> ${ev.fiscal_period || 'N/A'}</span>
+          <span><strong>Chunk:</strong> #${ev.chunk_index}</span>
+          <span><strong>Industry:</strong> ${ev.metadata.industry || 'Corporate'}</span>
+          <span><strong>Geography:</strong> ${ev.metadata.geography || 'Global'}</span>
+          <span><strong>Confidence:</strong> ${(ev.metadata.confidence_score * 100).toFixed(0)}%</span>
+        </div>
+      </div>
+    `).join('');
+
+    showToast(`Retrieved ${data.results_count} evidence chunks`);
+  } catch (err) {
+    resultsContainer.innerHTML = `<div style="color:var(--accent-rose); padding:16px;">Error: ${err.message}</div>`;
+    showToast(`Search error: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+async function generateRecommendation() {
+  const query = document.getElementById('rag-recom-query').value.trim();
+  const ticker = document.getElementById('rag-recom-ticker').value;
+  const threshold = parseFloat(document.getElementById('rag-recom-threshold').value) || 0.68;
+
+  const btn = document.getElementById('btn-generate-recom');
+  const outCard = document.getElementById('rag-recom-output');
+
+  if (!query) {
+    showToast('Please provide a financial analysis prompt');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Synthesizing Grounded Insights (FR-014)...';
+  outCard.classList.remove('hidden');
+  outCard.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Retrieving evidence, cross-referencing citations, and evaluating factual grounding...</p></div>';
+
+  try {
+    const payload = {
+      query,
+      ticker: ticker !== 'ALL' ? ticker : null,
+      min_similarity: threshold,
+      top_k: 4
+    };
+
+    const res = await fetch('/api/rag/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Recommendation generation failed');
+
+    const isGrounded = data.status === 'GROUNDED';
+
+    outCard.innerHTML = `
+      <div class="grounded-banner ${isGrounded ? 'success' : 'insufficient'}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          ${isGrounded
+            ? '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline>'
+            : '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>'}
+        </svg>
+        <div>
+          <div>${isGrounded ? 'VERIFIED GROUNDED RECOMMENDATION (FR-014)' : 'EXPLICIT INSUFFICIENT EVIDENCE RESULT (FR-014)'}</div>
+          <div style="font-size:0.75rem; font-weight:normal; opacity:0.85;">
+            ${isGrounded
+              ? `Supported by ${data.evidence_count} source citations | Avg Similarity: ${(data.average_similarity * 100).toFixed(1)}%`
+              : data.insufficient_evidence_reason}
+          </div>
+        </div>
+      </div>
+
+      <div class="recom-body">${data.recommendation.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+
+      ${isGrounded && data.key_findings.length > 0 ? `
+        <div style="margin-top:14px;">
+          <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; margin-bottom:8px;">
+            Key Factual Findings
+          </h4>
+          <ul class="findings-list">
+            ${data.key_findings.map(f => `<li>${f}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      ${isGrounded && data.citations.length > 0 ? `
+        <div style="margin-top:16px;">
+          <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.05em; margin-bottom:8px;">
+            Verified Provenance & Source Citations (${data.citations.length})
+          </h4>
+          <div class="citations-container">
+            ${data.citations.map(c => `
+              <div class="citation-card">
+                <div class="citation-card-head">
+                  <span style="color:var(--accent-indigo); font-weight:700;">[${c.citation_id}] ${c.title}</span>
+                  <span class="similarity-badge">${(c.similarity_score * 100).toFixed(1)}% Match</span>
+                </div>
+                <div class="citation-excerpt">"${c.excerpt}"</div>
+                <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">
+                  Doc #${c.document_id} • ${c.file_name} • ${c.fiscal_period || 'N/A'} • Chunk #${c.chunk_index} • Conf: ${(c.confidence_score * 100).toFixed(0)}%
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+
+    showToast(isGrounded ? 'Grounded recommendation generated' : 'Insufficient evidence warning reported');
+  } catch (err) {
+    outCard.innerHTML = `<div style="color:var(--accent-rose); padding:16px;">Error: ${err.message}</div>`;
+    showToast(`Error: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+      Generate Grounded Recommendation (FR-014)
+    `;
   }
 }

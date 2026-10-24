@@ -27,3 +27,6 @@ xlrd==2.0.1
 # HTTP Client
 httpx==0.27.2
 requests==2.32.3
+
+# Knowledge Management & Vector Embeddings (FR-010 to FR-014)
+fastembed==0.9.0

@@ -11,3 +11,13 @@ venv/
 htmlcov/
 .idea/
 .vscode/
+
+# Local database and uploaded test data
+data/*.db
+data/*.db-*
+data/uploads/
+
+# Local database and uploaded test data
+data/*.db
+data/*.db-*
+data/uploads/

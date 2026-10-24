@@ -21,13 +21,20 @@ from backend.app.api.schemas import (
     CreateMarketEventRequest,
     ClassifyEventRequest,
     ClassifyEventResponse,
-    MarketIntelligenceDashboardResponse
+    MarketIntelligenceDashboardResponse,
+    RAGSearchRequest,
+    RAGSearchResponse,
+    RAGRecommendRequest,
+    RAGRecommendResponse,
+    RAGStatusResponse,
+    RAGIndexAllResponse
 )
 from backend.app.services.historical_ingestion import HistoricalIngestionService
 from backend.app.services.document_ingestion import DocumentIngestionService, SUPPORTED_DOC_TYPES
 from backend.app.services.metrics_engine import MetricsEngine
 from backend.app.services.scheduler_service import SchedulerService
 from backend.app.services.market_intelligence import MarketIntelligenceService
+from backend.app.services.rag_service import RAGService
 
 router = APIRouter(prefix="/api", tags=["financial-engine"])
 
@@ -36,8 +43,13 @@ def health_check():
     return {
         "status": "healthy",
         "service": "Fintech Financial Intelligence & Data Management Platform",
-        "supported_requirements": ["FR-001", "FR-002", "FR-003", "FR-004"]
+        "supported_requirements": [
+            "FR-001", "FR-002", "FR-003", "FR-004",
+            "FR-005", "FR-006", "FR-007", "FR-008", "FR-009",
+            "FR-010", "FR-011", "FR-012", "FR-013", "FR-014"
+        ]
     }
+
 
 # ============================================================================
 # FR-001: 5-Year Historical Financial Data Management
@@ -92,7 +104,7 @@ async def upload_document(
     try:
         file_bytes = await file.read()
         p_date = date.fromisoformat(period_date) if period_date else None
-        
+
         result = DocumentIngestionService.ingest_document(
             db=db,
             ticker=ticker,
@@ -404,3 +416,89 @@ def get_impact_matrix(db: Session = Depends(get_db)):
             matrix[cat]["TOTAL"] += 1
 
     return matrix
+
+# ============================================================================
+# Section 2.3 Knowledge Management and RAG (FR-010 to FR-014)
+# ============================================================================
+
+@router.get("/rag/status", response_model=RAGStatusResponse)
+def get_rag_status(db: Session = Depends(get_db)):
+    """
+    FR-010: Returns persistent vector storage status, chunk counts,
+    and verified embedding model specifications (BAAI/bge-small-en-v1.5).
+    """
+    return RAGService.get_rag_status(db)
+
+@router.post("/rag/index/{document_id}")
+def index_document(document_id: int, force: bool = Query(False), db: Session = Depends(get_db)):
+    """
+    FR-010: Explicitly trigger persistent vector indexing for a document.
+    Calculates SHA-256 hashes and guarantees idempotency.
+    """
+    try:
+        return RAGService.index_document(db=db, document_id=document_id, force=force)
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
+
+@router.post("/rag/index-all", response_model=RAGIndexAllResponse)
+def index_all_documents(force: bool = Query(False), db: Session = Depends(get_db)):
+    """
+    FR-010: Indexes / synchronizes all unstructured documents in the knowledge base.
+    Guarantees idempotency via SHA-256 content hashing to avoid duplicate chunks.
+    """
+    try:
+        return RAGService.index_all_unindexed(db=db, force=force)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backfill indexing failed: {str(e)}")
+
+@router.post("/rag/search", response_model=RAGSearchResponse)
+def search_semantic_evidence(req: RAGSearchRequest, db: Session = Depends(get_db)):
+    """
+    FR-011, FR-012, FR-013: Semantic Evidence Retrieval.
+    - Symmetrically computes query vector via BAAI/bge-small-en-v1.5 (384 dimensions).
+    - Filters by ticker, doc_type, fiscal_period, industry, geography, and confidence score (FR-013).
+    - Ranks by cosine similarity and suppresses near-duplicates (FR-011).
+    - Preserves verifiable provenance and source attribution (FR-012).
+    """
+    try:
+        return RAGService.search_evidence(
+            db=db,
+            query=req.query,
+            ticker=req.ticker,
+            doc_type=req.doc_type,
+            fiscal_period=req.fiscal_period,
+            industry=req.industry,
+            geography=req.geography,
+            min_confidence=req.min_confidence,
+            min_similarity=req.min_similarity or 0.35,
+            top_k=req.top_k or 5
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Semantic retrieval failed: {str(e)}")
+
+@router.post("/rag/recommend", response_model=RAGRecommendResponse)
+def generate_grounded_recommendation(req: RAGRecommendRequest, db: Session = Depends(get_db)):
+    """
+    FR-014: Grounded Financial Recommendations & RAG Synthesis.
+    - Synthesizes actionable recommendations strictly grounded in retrieved evidence.
+    - References verifiable citations [Citation 1, Citation 2, ...].
+    - Guardrail against hallucinations: Returns explicit INSUFFICIENT_EVIDENCE if no
+      verified evidence passes the relevance threshold.
+    """
+    try:
+        return RAGService.generate_grounded_recommendation(
+            db=db,
+            query=req.query,
+            ticker=req.ticker,
+            doc_type=req.doc_type,
+            fiscal_period=req.fiscal_period,
+            industry=req.industry,
+            geography=req.geography,
+            min_confidence=req.min_confidence,
+            min_similarity=req.min_similarity if req.min_similarity is not None else 0.68,
+            top_k=req.top_k or 4
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommendation synthesis failed: {str(e)}")
