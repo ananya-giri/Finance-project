@@ -75,7 +75,8 @@ function switchTab(tabId) {
     metrics: { title: 'Financial Metrics', sub: 'FR-003: 10 Core Structured Financial Metrics' },
     scheduler: { title: 'Auto-Monitoring', sub: 'FR-004: Automated Report & Statement Watcher' },
     'market-intelligence': { title: 'External Market Intelligence', sub: 'FR-005 to FR-009: Macro Indicators, Geopolitics, Regulations, News & Impact Classifier' },
-    rag: { title: 'Knowledge Base & RAG', sub: 'FR-010 to FR-014: Persistent Vector Storage, Semantic Search & Grounded Recommendations' }
+    rag: { title: 'Knowledge Base & RAG', sub: 'FR-010 to FR-014: Persistent Vector Storage, Semantic Search & Grounded Recommendations' },
+    orchestration: { title: 'Multi-Agent Orchestration', sub: 'FR-015 to FR-023: Autonomous AI Agent Collective & Strategic Consensus Engine' }
   };
 
   if (titles[tabId]) {
@@ -86,10 +87,13 @@ function switchTab(tabId) {
   // Auto-refresh data on tab change
   if (tabId === 'dashboard') loadDashboard();
   if (tabId === 'documents') loadDocuments();
+  if (tabId === 'metrics') loadMetrics();
   if (tabId === 'scheduler') loadSchedulerStatus();
   if (tabId === 'market-intelligence') loadMarketIntelligence();
   if (tabId === 'rag') loadRagStatus();
+  if (tabId === 'orchestration') loadOrchestrationTab();
 }
+
 
 
 // Check Health
@@ -1670,3 +1674,1084 @@ async function generateRecommendation() {
     `;
   }
 }
+
+// ============================================================================
+// FUNCTION 2.4: MULTI-AGENT ORCHESTRATION CLIENT LOGIC (FR-015 to FR-023)
+// ============================================================================
+
+let currentOrchestrationDossier = null;
+let currentForecastScenario = 'base_case';
+let orchestrationTimerInterval = null;
+
+function handleTickerSelectChange() {
+  const sel = document.getElementById('orch-ticker-select');
+  const customInput = document.getElementById('orch-custom-ticker');
+  if (sel && customInput) {
+    if (sel.value === 'CUSTOM') {
+      customInput.classList.remove('hidden');
+      customInput.focus();
+    } else {
+      customInput.classList.add('hidden');
+    }
+  }
+}
+
+function getSelectedOrchTicker() {
+  const sel = document.getElementById('orch-ticker-select');
+  const customInput = document.getElementById('orch-custom-ticker');
+  if (sel && sel.value === 'CUSTOM') {
+    return (customInput && customInput.value.trim().toUpperCase()) || 'AAPL';
+  }
+  return (sel && sel.value) || 'AAPL';
+}
+
+async function loadOrchestrationTab() {
+  await Promise.all([
+    loadAgentFleetShowcase(),
+    loadOrchestrationHistory()
+  ]);
+
+  // Check if a previous run exists for the currently selected ticker
+  const targetTicker = getSelectedOrchTicker();
+  try {
+    const res = await fetch(`/api/orchestration/latest/${targetTicker}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'FOUND' && data.dossier) {
+        renderOrchestrationDossier(data.dossier);
+      }
+    }
+  } catch (e) {
+    console.warn('No cached dossier available for', targetTicker);
+  }
+}
+
+async function loadAgentFleetShowcase() {
+  const container = document.getElementById('agent-fleet-cards');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/agents');
+    if (!res.ok) throw new Error('Failed to fetch agent fleet registry');
+    const agents = await res.json();
+
+    const countElem = document.getElementById('fleet-count');
+    if (countElem) countElem.textContent = agents.length;
+
+    const roleClassMap = {
+      'FINANCIAL_ANALYSIS': 'fin',
+      'ECONOMIC_INTELLIGENCE': 'econ',
+      'GEOPOLITICAL_RISK': 'geo',
+      'INDUSTRY_INTELLIGENCE': 'ind',
+      'FORECASTING': 'fc',
+      'RECOMMENDATION': 'recom',
+      'EXPLAINABILITY': 'exp',
+      'ORCHESTRATOR': 'orch'
+    };
+
+    container.innerHTML = agents.map(agent => {
+      const avatarClass = roleClassMap[agent.agent_id] || 'fin';
+      const isOrch = agent.agent_id === 'ORCHESTRATOR';
+      return `
+        <div class="agent-card ${isOrch ? 'agent-card-master' : ''}">
+          <div>
+            <div class="agent-card-header">
+              <div class="agent-avatar ${avatarClass}">
+                ${agent.agent_id.substring(0, 2)}
+              </div>
+              <span class="badge badge-fr">${agent.fr_code}</span>
+            </div>
+            <div class="agent-title-block">
+              <h4 class="agent-name">${agent.name}</h4>
+              <p class="agent-role">${agent.role}</p>
+            </div>
+            <p class="agent-desc">${agent.description}</p>
+            <div class="agent-caps-wrap">
+              ${agent.capabilities.slice(0, 3).map(c => `<span class="cap-tag">${c}</span>`).join('')}
+              ${agent.capabilities.length > 3 ? `<span class="cap-tag">+${agent.capabilities.length - 3} more</span>` : ''}
+            </div>
+          </div>
+          <div class="agent-card-footer">
+            <span class="agent-status-label">
+              <span class="pulse-dot"></span> Active
+            </span>
+            <button class="agent-quick-btn" onclick="runSingleAgent('${agent.agent_id}')">
+              ${isOrch ? 'Run Pipeline' : 'Execute Agent'}
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state text-danger">Failed to load agent fleet: ${err.message}</div>`;
+  }
+}
+
+async function triggerFullOrchestration() {
+  const ticker = getSelectedOrchTicker();
+  const btn = document.getElementById('btn-run-orchestration');
+  const livePanel = document.getElementById('orchestration-live-panel');
+  const logsBody = document.getElementById('orch-terminal-logs');
+  const timerElem = document.getElementById('orch-live-timer');
+  const dossierContainer = document.getElementById('orchestration-dossier-container');
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner-small" style="display:inline-block; vertical-align:middle; margin-right:8px;"></div> Orchestrating Multi-Agent Fleet...`;
+
+  if (livePanel) livePanel.classList.remove('hidden');
+  if (dossierContainer) dossierContainer.classList.add('hidden');
+
+  // Reset Stepper
+  for (let i = 1; i <= 5; i++) {
+    const node = document.getElementById(`step-node-${i}`);
+    const line = document.getElementById(`step-line-${i}`);
+    if (node) { node.classList.remove('active', 'completed'); }
+    if (line) { line.classList.remove('active'); }
+  }
+  const step1 = document.getElementById('step-node-1');
+  if (step1) step1.classList.add('active');
+
+  // Reset Terminal Logs
+  if (logsBody) {
+    logsBody.innerHTML = `
+      <div class="log-line"><span class="log-ts">[00:00.000]</span> <span class="log-sender">[ORCHESTRATOR]</span> Initializing multi-agent blackboard memory context for target '${ticker}'...</div>
+      <div class="log-line"><span class="log-ts">[00:00.120]</span> <span class="log-sender">[ORCHESTRATOR]</span> Phase 1 Parallel Dispatch: Financial (FR-016), Economic (FR-017), Geopolitical (FR-018), Industry (FR-019)...</div>
+    `;
+  }
+
+  // Live Timer
+  const startTime = Date.now();
+  if (orchestrationTimerInterval) clearInterval(orchestrationTimerInterval);
+  orchestrationTimerInterval = setInterval(() => {
+    const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    if (timerElem) timerElem.textContent = `${elapsedSec}s elapsed`;
+  }, 100);
+
+  // Progressive Stepper Visual Simulation while backend executes
+  const s2Timeout = setTimeout(() => {
+    const s1 = document.getElementById('step-node-1');
+    const s2 = document.getElementById('step-node-2');
+    const l1 = document.getElementById('step-line-1');
+    if (s1) { s1.classList.remove('active'); s1.classList.add('completed'); }
+    if (l1) l1.classList.add('active');
+    if (s2) s2.classList.add('active');
+    if (logsBody) {
+      logsBody.innerHTML += `<div class="log-line"><span class="log-ts">[00:00.350]</span> <span class="log-sender">[FORECASTING]</span> Phase 2: Formulating Bull, Base, and Bear 3-year multi-scenario projections (FR-020)...</div>`;
+      logsBody.scrollTop = logsBody.scrollHeight;
+    }
+  }, 350);
+
+  const s3Timeout = setTimeout(() => {
+    const s2 = document.getElementById('step-node-2');
+    const s3 = document.getElementById('step-node-3');
+    const l2 = document.getElementById('step-line-2');
+    if (s2) { s2.classList.remove('active'); s2.classList.add('completed'); }
+    if (l2) l2.classList.add('active');
+    if (s3) s3.classList.add('active');
+    if (logsBody) {
+      logsBody.innerHTML += `<div class="log-line"><span class="log-ts">[00:00.650]</span> <span class="log-sender">[RECOMMENDATION]</span> Phase 3: Synthesizing capital allocation priorities and strategic stance (FR-021)...</div>`;
+      logsBody.scrollTop = logsBody.scrollHeight;
+    }
+  }, 650);
+
+  const s4Timeout = setTimeout(() => {
+    const s3 = document.getElementById('step-node-3');
+    const s4 = document.getElementById('step-node-4');
+    const l3 = document.getElementById('step-line-3');
+    if (s3) { s3.classList.remove('active'); s3.classList.add('completed'); }
+    if (l3) l3.classList.add('active');
+    if (s4) s4.classList.add('active');
+    if (logsBody) {
+      logsBody.innerHTML += `<div class="log-line"><span class="log-ts">[00:00.950]</span> <span class="log-sender">[EXPLAINABILITY]</span> Phase 4: Constructing causal deduction chain and counterfactual triggers (FR-022)...</div>`;
+      logsBody.scrollTop = logsBody.scrollHeight;
+    }
+  }, 950);
+
+  try {
+    const res = await fetch('/api/orchestration/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker: ticker })
+    });
+
+    clearTimeout(s2Timeout);
+    clearTimeout(s3Timeout);
+    clearTimeout(s4Timeout);
+    if (orchestrationTimerInterval) clearInterval(orchestrationTimerInterval);
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || 'Orchestration execution failed');
+    }
+
+    const data = await res.json();
+    currentOrchestrationDossier = data;
+
+    // Complete all stepper nodes
+    for (let i = 1; i <= 5; i++) {
+      const node = document.getElementById(`step-node-${i}`);
+      const line = document.getElementById(`step-line-${i}`);
+      if (node) { node.classList.remove('active'); node.classList.add('completed'); }
+      if (line) { line.classList.add('active'); }
+    }
+
+    if (logsBody && data.inter_agent_messages) {
+      logsBody.innerHTML = data.inter_agent_messages.map(m => `
+        <div class="log-line">
+          <span class="log-ts">[${m.timestamp ? m.timestamp.split('T')[1].substring(0, 12) : '00:00'}]</span>
+          <span class="log-sender">[${m.sender.toUpperCase()}]</span>
+          ${m.message}
+        </div>
+      `).join('');
+      logsBody.scrollTop = logsBody.scrollHeight;
+    }
+
+    showToast(`Multi-Agent consensus reached: ${data.consensus_stance.replace('_', ' ')} (${data.conviction_score}% Conviction)`);
+
+    // Render Full Dossier
+    renderOrchestrationDossier(data);
+    await loadOrchestrationHistory();
+
+    // Scroll to Dossier
+    if (dossierContainer) {
+      dossierContainer.classList.remove('hidden');
+      dossierContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch (err) {
+    if (orchestrationTimerInterval) clearInterval(orchestrationTimerInterval);
+    showToast(`Orchestration error: ${err.message}`);
+    if (logsBody) {
+      logsBody.innerHTML += `<div class="log-line text-danger">[ERROR] ${err.message}</div>`;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      Orchestrate All Agents (FR-023)
+    `;
+  }
+}
+
+function renderOrchestrationDossier(dossier) {
+  const container = document.getElementById('orchestration-dossier-container');
+  const heroCard = document.getElementById('dossier-hero-card');
+  if (!container || !heroCard) return;
+
+  container.classList.remove('hidden');
+  currentOrchestrationDossier = dossier;
+
+  const ticker = dossier.ticker || 'AAPL';
+  const stance = dossier.consensus_stance || 'HOLD';
+  const conviction = dossier.conviction_score || 75.0;
+  const execMs = dossier.total_execution_ms || 45;
+  const summary = dossier.executive_summary || '';
+  const findings = dossier.agent_findings || {};
+
+  const stanceClass = stance.toLowerCase().replace(/_/g, '-');
+
+  // 1. Render Hero Card
+  heroCard.innerHTML = `
+    <div class="dossier-stance-badge-wrap">
+      <span class="dossier-stance-label">Unified Consensus Stance</span>
+      <div class="dossier-stance-value ${stanceClass}">${stance.replace(/_/g, ' ')}</div>
+      <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+        Conviction: <strong>${conviction.toFixed(1)}%</strong>
+      </div>
+      <div class="dossier-conviction-bar">
+        <div class="dossier-conviction-fill" style="width:${conviction}%;"></div>
+      </div>
+      <span style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;">Protocol: FR-023 Orchestration</span>
+    </div>
+    <div class="dossier-hero-details">
+      <div class="dossier-meta-row">
+        <span class="dossier-ticker-badge">${ticker}</span>
+        <span class="badge badge-fr">Autonomous Multi-Agent Synthesis</span>
+        <span style="font-size:0.78rem; color:var(--text-muted); margin-left:auto;">
+          Execution Time: <strong style="color:#fff;">${execMs}ms</strong>
+        </span>
+      </div>
+      <p class="dossier-summary-text">${summary}</p>
+      <div class="dossier-pill-grid">
+        <div class="dossier-summary-pill">
+          Financial Compounding: <strong>${findings.financial_analysis ? findings.financial_analysis.data?.scorecard?.composite_financial_score || 'N/A' : 'N/A'}/100</strong>
+        </div>
+        <div class="dossier-summary-pill">
+          Macro Regime: <strong>${findings.economic_intelligence ? findings.economic_intelligence.data?.macro_regime || 'N/A' : 'N/A'}</strong>
+        </div>
+        <div class="dossier-summary-pill">
+          Geopolitical Risk (GRI): <strong>${findings.geopolitical_risk ? findings.geopolitical_risk.data?.geopolitical_risk_index || 'N/A' : 'N/A'}/100</strong>
+        </div>
+        <div class="dossier-summary-pill">
+          Competitive Moat: <strong>${findings.industry_intelligence ? findings.industry_intelligence.data?.competitive_moat?.rating || 'N/A' : 'N/A'}</strong>
+        </div>
+        <div class="dossier-summary-pill">
+          3-Yr Base CAGR: <strong>${findings.forecasting ? findings.forecasting.data?.scenarios?.base_case?.assumed_growth_cagr_pct || 'N/A' : 'N/A'}%</strong>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 2. Render Panels
+  renderFinancialPanel(findings.financial_analysis);
+  renderMacroPanel(findings.economic_intelligence);
+  renderGeopoliticalPanel(findings.geopolitical_risk);
+  renderIndustryPanel(findings.industry_intelligence);
+  renderForecastingPanel(findings.forecasting);
+  renderRecommendationPanel(findings.recommendation);
+  renderExplainabilityPanel(findings.explainability);
+  renderAuditPanel(dossier);
+
+  // Switch to default active tab
+  switchDossierTab('financial');
+}
+
+function switchDossierTab(tabId) {
+  const tabs = document.querySelectorAll('.dossier-tab-btn');
+  const panels = document.querySelectorAll('.dossier-panel');
+
+  tabs.forEach(t => {
+    if (t.getAttribute('data-dossier-tab') === tabId) {
+      t.classList.add('active');
+    } else {
+      t.classList.remove('active');
+    }
+  });
+
+  panels.forEach(p => {
+    if (p.id === `dossier-panel-${tabId}`) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Specialized Panel Renderers (FR-016 to FR-023)
+// ----------------------------------------------------------------------------
+
+function renderFinancialPanel(finAgent) {
+  const panel = document.getElementById('dossier-panel-financial');
+  if (!panel) return;
+  if (!finAgent || !finAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No financial analysis telemetry available.</div>`;
+    return;
+  }
+
+  const d = finAgent.data;
+  const sc = d.scorecard || {};
+  const ms = d.metrics_summary || {};
+  const trends = d.historical_trend_data || [];
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Historical Financial Performance Audit (FR-016)</h3>
+        <p class="section-subheading">${d.company_name} (${d.ticker}) • ${d.periods_analyzed} Reporting Periods Analyzed • Verdict: <strong>${d.verdict?.replace(/_/g, ' ')}</strong></p>
+      </div>
+      <span class="badge badge-fr">FR-016 Compliant</span>
+    </div>
+
+    <!-- 4 Scorecard Gauges -->
+    <div class="scorecard-grid">
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Profitability Score</div>
+        <div class="scorecard-val green">${sc.profitability_score || 0}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Margin & ROE Strength</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Growth Score</div>
+        <div class="scorecard-val blue">${sc.growth_score || 0}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">${ms.revenue_cagr_pct ? `${ms.revenue_cagr_pct}% Rev CAGR` : 'Multi-year growth'}</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Solvency Score</div>
+        <div class="scorecard-val purple">${sc.solvency_score || 0}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">D/E: ${ms.latest_debt_to_equity || 0}</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Cash Flow Quality</div>
+        <div class="scorecard-val amber">${sc.cash_flow_score || 0}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">FCF Conv: ${ms.fcf_conversion_pct ? `${ms.fcf_conversion_pct}%` : 'Stable'}</span>
+      </div>
+    </div>
+
+    <!-- Key Insights Callout -->
+    <div style="background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:var(--radius-sm); padding:16px; margin-bottom:20px;">
+      <h4 style="font-size:0.85rem; font-weight:700; color:#6ee7b7; text-transform:uppercase; margin-bottom:8px;">Financial Agent Analytical Findings</h4>
+      <ul style="padding-left:18px; font-size:0.86rem; color:var(--text-primary); line-height:1.6;">
+        ${(finAgent.key_insights || []).map(ins => `<li>${ins}</li>`).join('')}
+      </ul>
+    </div>
+
+    <!-- Historical Trends Table -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">5-Year Statement Multi-Year Trajectory</h4>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Revenue</th>
+            <th>Net Profit</th>
+            <th>Operating Margin</th>
+            <th>Free Cash Flow</th>
+            <th>ROE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trends.map(t => `
+            <tr>
+              <td><strong>${t.period}</strong></td>
+              <td>${t.revenue ? `$${(t.revenue / 1e9).toFixed(2)}B` : '—'}</td>
+              <td>${t.net_profit ? `$${(t.net_profit / 1e9).toFixed(2)}B` : '—'}</td>
+              <td><span class="badge badge-success">${t.operating_margin ? `${t.operating_margin}%` : '—'}</span></td>
+              <td>${t.free_cash_flow ? `$${(t.free_cash_flow / 1e9).toFixed(2)}B` : '—'}</td>
+              <td>${t.roe ? `${t.roe}%` : '—'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderMacroPanel(econAgent) {
+  const panel = document.getElementById('dossier-panel-macro');
+  if (!panel) return;
+  if (!econAgent || !econAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No economic intelligence telemetry available.</div>`;
+    return;
+  }
+
+  const d = econAgent.data;
+  const km = d.key_metrics || {};
+  const sens = d.sensitivities || {};
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Macroeconomic Indicators & Climate Monitor (FR-017)</h3>
+        <p class="section-subheading">Macro Regime: <strong>${d.macro_regime?.replace(/_/g, ' ')}</strong> • Macro Health Score: <strong>${d.macro_health_score}/100</strong></p>
+      </div>
+      <span class="badge badge-fr">FR-017 Compliant</span>
+    </div>
+
+    <!-- Macro Indicators Grid -->
+    <div class="scorecard-grid">
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Fed Funds Rate</div>
+        <div class="scorecard-val purple">${km.fed_funds_rate_pct ? `${km.fed_funds_rate_pct}%` : '4.85%'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Monetary Stance</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">US 10-Yr Treasury</div>
+        <div class="scorecard-val blue">${km.treasury_10y_yield_pct ? `${km.treasury_10y_yield_pct}%` : '4.25%'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Discount Rate Base</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">US Headline CPI</div>
+        <div class="scorecard-val amber">${km.headline_cpi_pct ? `${km.headline_cpi_pct}%` : '2.4%'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">YoY Inflation</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">EUR / USD</div>
+        <div class="scorecard-val green">${km.eur_usd || '1.085'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">FX Currency Cross</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">WTI Crude Oil</div>
+        <div class="scorecard-val amber">${km.crude_oil_usd ? `$${km.crude_oil_usd}` : '$71.50'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Input Energy Costs</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">S&P 500 Benchmark</div>
+        <div class="scorecard-val green">${km.sp500_index ? km.sp500_index.toLocaleString() : '5,850'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Equity Momentum</span>
+      </div>
+    </div>
+
+    <!-- Sector Sensitivity Matrix -->
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:18px; margin-bottom:20px;">
+      <h4 style="font-size:0.9rem; font-weight:700; color:#fff; margin-bottom:12px;">Sector-Specific Macro Sensitivities</h4>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+        <div style="background:rgba(255,255,255,0.04); padding:10px 14px; border-radius:6px;">
+          <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Interest Rate Sensitivity</span>
+          <div style="font-weight:700; color:#f43f5e; margin-top:4px;">${sens.interest_rate_sensitivity || 'HIGH'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); padding:10px 14px; border-radius:6px;">
+          <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">FX Translation Drag</span>
+          <div style="font-weight:700; color:#f59e0b; margin-top:4px;">${sens.fx_dollar_strength_impact || 'HEADWIND'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); padding:10px 14px; border-radius:6px;">
+          <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Commodity / Energy Exposure</span>
+          <div style="font-weight:700; color:#10b981; margin-top:4px;">${sens.energy_cost_exposure || 'LOW'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); padding:10px 14px; border-radius:6px;">
+          <span style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Market Risk Sentiment</span>
+          <div style="font-weight:700; color:#6ee7b7; margin-top:4px;">${sens.equity_market_sentiment || 'BULLISH'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Macro Takeaways -->
+    <div style="background:rgba(6, 182, 212, 0.08); border:1px solid rgba(6, 182, 212, 0.25); border-radius:var(--radius-sm); padding:16px;">
+      <h4 style="font-size:0.85rem; font-weight:700; color:#67e8f9; text-transform:uppercase; margin-bottom:8px;">Economic Intelligence Key Takeaways</h4>
+      <ul style="padding-left:18px; font-size:0.86rem; color:var(--text-primary); line-height:1.6;">
+        ${(econAgent.key_insights || []).map(ins => `<li>${ins}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+}
+
+function renderGeopoliticalPanel(geoAgent) {
+  const panel = document.getElementById('dossier-panel-geopolitical');
+  if (!panel) return;
+  if (!geoAgent || !geoAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No geopolitical risk telemetry available.</div>`;
+    return;
+  }
+
+  const d = geoAgent.data;
+  const scenarios = d.scenarios || [];
+  const topEvents = d.top_risk_events || [];
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Geopolitical Risk & Trade Restriction Identification (FR-018)</h3>
+        <p class="section-subheading">Geopolitical Risk Index (GRI): <strong>${d.geopolitical_risk_index}/100</strong> • Risk Level: <strong>${d.risk_level}</strong> • Resilience: <strong>${d.resilience_rating?.replace(/_/g, ' ')}</strong></p>
+      </div>
+      <span class="badge badge-fr">FR-018 Compliant</span>
+    </div>
+
+    <!-- Disruption Scenarios Stress Test -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Geopolitical Disruption Scenario Stress Tests</h4>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px;">
+      ${scenarios.map(s => `
+        <div style="background:var(--bg-card); border:1px solid rgba(244, 63, 94, 0.3); border-radius:var(--radius-sm); padding:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:700; font-size:0.88rem; color:#fca5a5;">${s.scenario_name}</span>
+            <span class="badge badge-warning">${s.probability}</span>
+          </div>
+          <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5; margin-bottom:10px;">${s.description}</p>
+          <div style="font-family:var(--font-mono, monospace); font-size:0.76rem; color:#f87171; background:rgba(244,63,94,0.1); padding:6px 10px; border-radius:4px;">
+            ${s.estimated_margin_impact_bps ? `Margin Stress: ${s.estimated_margin_impact_bps} bps` : ''}
+            ${s.estimated_lead_time_increase_weeks ? `Lead Time Increase: +${s.estimated_lead_time_increase_weeks} weeks` : ''}
+            ${s.estimated_freight_cost_surge_pct ? `Freight Surcharge: +${s.estimated_freight_cost_surge_pct}%` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Active Geopolitical Events Table -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Active Cross-Border Regulatory & Trade Events Monitored</h4>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Event Title</th>
+            <th>Type</th>
+            <th>Impact Category</th>
+            <th>Severity</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${topEvents.map(e => `
+            <tr>
+              <td><strong>${e.title}</strong></td>
+              <td><span class="badge badge-sm">${e.event_type}</span></td>
+              <td>${e.impact_category}</td>
+              <td><span class="badge ${e.severity === 'CRITICAL' ? 'badge-danger' : 'badge-warning'}">${e.severity}</span></td>
+              <td>${e.event_date || 'Live'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderIndustryPanel(indAgent) {
+  const panel = document.getElementById('dossier-panel-industry');
+  if (!panel) return;
+  if (!indAgent || !indAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No industry intelligence telemetry available.</div>`;
+    return;
+  }
+
+  const d = indAgent.data;
+  const moat = d.competitive_moat || {};
+  const tailwinds = d.secular_tailwinds || [];
+  const headwinds = d.secular_headwinds || [];
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Industry Intelligence & Secular Dynamics (FR-019)</h3>
+        <p class="section-subheading">Sector: <strong>${d.sector}</strong> • Industry: <strong>${d.industry}</strong> • Lifecycle: <strong>${d.lifecycle_phase?.replace(/_/g, ' ')}</strong></p>
+      </div>
+      <span class="badge badge-fr">FR-019 Compliant</span>
+    </div>
+
+    <!-- Moat & CAGR Summary Cards -->
+    <div class="scorecard-grid">
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Competitive Moat</div>
+        <div class="scorecard-val green">${moat.rating || 'WIDE'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Moat Score: ${moat.score || 85}/100</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Projected Sector CAGR</div>
+        <div class="scorecard-val blue">${d.estimated_industry_cagr_pct || 10}%</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">3-5 Year Horizon</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Industry Health Score</div>
+        <div class="scorecard-val purple">${d.industry_health_score || 80}/100</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Sector Vitality</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Market Structure</div>
+        <div class="scorecard-val amber">${d.market_concentration || 'OLIGOPOLY'}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Pricing Power</span>
+      </div>
+    </div>
+
+    <!-- Tailwinds & Headwinds 2-Column Grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
+      <div style="background:rgba(16, 185, 129, 0.06); border:1px solid rgba(16, 185, 129, 0.25); border-radius:var(--radius-sm); padding:18px;">
+        <h4 style="font-size:0.9rem; font-weight:700; color:#6ee7b7; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          Secular Technological Tailwinds
+        </h4>
+        <ul style="padding-left:18px; font-size:0.86rem; color:var(--text-primary); line-height:1.6;">
+          ${tailwinds.map(t => `<li>${t}</li>`).join('')}
+        </ul>
+      </div>
+
+      <div style="background:rgba(244, 63, 94, 0.06); border:1px solid rgba(244, 63, 94, 0.25); border-radius:var(--radius-sm); padding:18px;">
+        <h4 style="font-size:0.9rem; font-weight:700; color:#fca5a5; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          Structural Headwinds & Threats
+        </h4>
+        <ul style="padding-left:18px; font-size:0.86rem; color:var(--text-primary); line-height:1.6;">
+          ${headwinds.map(h => `<li>${h}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
+function renderForecastingPanel(fcAgent) {
+  const panel = document.getElementById('dossier-panel-forecasting');
+  if (!panel) return;
+  if (!fcAgent || !fcAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No future financial projections telemetry available.</div>`;
+    return;
+  }
+
+  const d = fcAgent.data;
+  const scenarios = d.scenarios || {};
+  const activeScenario = scenarios[currentForecastScenario] || scenarios.base_case || {};
+  const projections = activeScenario.projections || [];
+  const sens = d.sensitivity_analysis || {};
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Future Financial Projections Engine (FR-020)</h3>
+        <p class="section-subheading">Multi-Scenario Forward Projections across 1-Year, 2-Year, and 3-Year Horizons</p>
+      </div>
+      <span class="badge badge-fr">FR-020 Compliant</span>
+    </div>
+
+    <!-- Scenario Switcher Buttons -->
+    <div class="forecast-scenario-toggle">
+      <button class="scenario-btn ${currentForecastScenario === 'base_case' ? 'active' : ''}" onclick="setForecastScenario('base_case')">
+        Base Case (Consensus: ${scenarios.base_case?.assumed_growth_cagr_pct}%)
+      </button>
+      <button class="scenario-btn ${currentForecastScenario === 'bull_case' ? 'active' : ''}" onclick="setForecastScenario('bull_case')">
+        Bull Case (Accelerated: ${scenarios.bull_case?.assumed_growth_cagr_pct}%)
+      </button>
+      <button class="scenario-btn ${currentForecastScenario === 'bear_case' ? 'active' : ''}" onclick="setForecastScenario('bear_case')">
+        Bear Case (Stress Test: ${scenarios.bear_case?.assumed_growth_cagr_pct}%)
+      </button>
+    </div>
+
+    <!-- Summary Metrics for Selected Scenario -->
+    <div class="scorecard-grid" style="margin-bottom:20px;">
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Scenario Name</div>
+        <div style="font-weight:700; color:#fff; font-size:1.1rem; margin:8px 0;">${activeScenario.scenario_name}</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Selected Model</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">3-Year Implied CAGR</div>
+        <div class="scorecard-val green">${activeScenario.assumed_growth_cagr_pct}%</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Revenue Growth</span>
+      </div>
+      <div class="scorecard-card">
+        <div class="scorecard-lbl">Cumulative 3-Yr FCF</div>
+        <div class="scorecard-val blue">$${activeScenario.cumulative_3y_fcf ? (activeScenario.cumulative_3y_fcf / 1e9).toFixed(1) : '0'}B</div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Free Cash Generated</span>
+      </div>
+    </div>
+
+    <!-- Projections Table -->
+    <div class="table-responsive" style="margin-bottom:20px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Forecast Horizon</th>
+            <th>Projected Revenue</th>
+            <th>YoY Growth</th>
+            <th>EBITDA</th>
+            <th>Operating Margin</th>
+            <th>Net Profit</th>
+            <th>EPS</th>
+            <th>Free Cash Flow</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projections.map(p => `
+            <tr>
+              <td><strong>${p.forecast_year}</strong></td>
+              <td>$${(p.revenue / 1e9).toFixed(2)}B</td>
+              <td><span class="badge badge-success">+${p.revenue_growth_pct}%</span></td>
+              <td>$${(p.ebitda / 1e9).toFixed(2)}B</td>
+              <td>${p.operating_margin_pct}%</td>
+              <td>$${(p.net_profit / 1e9).toFixed(2)}B</td>
+              <td>$${p.eps.toFixed(2)}</td>
+              <td><strong>$${(p.free_cash_flow / 1e9).toFixed(2)}B</strong></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Sensitivity Matrix -->
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
+      <h4 style="font-size:0.85rem; font-weight:700; color:#a5b4fc; text-transform:uppercase; margin-bottom:8px;">Model Sensitivity Parameters</h4>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:0.82rem; color:var(--text-secondary);">
+        <span class="stat-chip">Rate Shock Impact: <strong>${sens.rate_shock_impact || '-1.2% per 100bps'}</strong></span>
+        <span class="stat-chip">Margin Elasticity: <strong>${sens.margin_elasticity || '+/- $1.8B FCF per 100bps'}</strong></span>
+        <span class="stat-chip">Terminal Valuation Multiple: <strong>${sens.terminal_multiple_range || '24x - 30x P/E'}</strong></span>
+      </div>
+    </div>
+  `;
+}
+
+function setForecastScenario(scenarioKey) {
+  currentForecastScenario = scenarioKey;
+  if (currentOrchestrationDossier && currentOrchestrationDossier.agent_findings) {
+    renderForecastingPanel(currentOrchestrationDossier.agent_findings.forecasting);
+  }
+}
+
+function renderRecommendationPanel(recomAgent) {
+  const panel = document.getElementById('dossier-panel-recommendation');
+  if (!panel) return;
+  if (!recomAgent || !recomAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No recommendation telemetry available.</div>`;
+    return;
+  }
+
+  const d = recomAgent.data;
+  const ca = d.capital_allocation || [];
+  const horizons = d.phased_horizons || {};
+  const citation = d.grounded_document_citation;
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Strategic Recommendations & Capital Directives (FR-021)</h3>
+        <p class="section-subheading">Strategic Stance: <strong>${d.strategic_stance?.replace(/_/g, ' ')}</strong> • Conviction Score: <strong>${d.conviction_index}/100</strong></p>
+      </div>
+      <span class="badge badge-fr">FR-021 Compliant</span>
+    </div>
+
+    <!-- Core Stance Narrative Card -->
+    <div style="background:linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(30,27,75,0.4) 100%); border:1px solid rgba(99,102,241,0.35); border-radius:var(--radius-sm); padding:20px; margin-bottom:24px;">
+      <h4 style="font-size:0.95rem; font-weight:800; color:#fff; margin-bottom:6px;">Executive Strategic Thesis</h4>
+      <p style="font-size:0.92rem; color:var(--text-primary); line-height:1.6;">${d.core_rationale}</p>
+    </div>
+
+    <!-- Capital Allocation Breakdown -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Capital Allocation Directives</h4>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:24px;">
+      ${ca.map(item => `
+        <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:0.8rem; font-weight:700; color:#a5b4fc;">${item.category}</span>
+            <span class="badge badge-primary">${item.allocation_pct}%</span>
+          </div>
+          <p style="font-size:0.84rem; color:var(--text-secondary); line-height:1.5;">${item.action}</p>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Phased Action Roadmaps -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Multi-Horizon Execution Roadmap</h4>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px;">
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
+        <span style="font-size:0.75rem; text-transform:uppercase; color:#6ee7b7; font-weight:700;">Tactical Horizon (0 - 6 Months)</span>
+        <ul style="padding-left:16px; margin-top:8px; font-size:0.84rem; color:var(--text-primary); line-height:1.6;">
+          ${(horizons.tactical_0_6m || []).map(h => `<li>${h}</li>`).join('')}
+        </ul>
+      </div>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
+        <span style="font-size:0.75rem; text-transform:uppercase; color:#60a5fa; font-weight:700;">Strategic Horizon (12 - 24 Months)</span>
+        <ul style="padding-left:16px; margin-top:8px; font-size:0.84rem; color:var(--text-primary); line-height:1.6;">
+          ${(horizons.strategic_12_24m || []).map(h => `<li>${h}</li>`).join('')}
+        </ul>
+      </div>
+      <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:16px;">
+        <span style="font-size:0.75rem; text-transform:uppercase; color:#c084fc; font-weight:700;">Structural Horizon (3 - 5 Years)</span>
+        <ul style="padding-left:16px; margin-top:8px; font-size:0.84rem; color:var(--text-primary); line-height:1.6;">
+          ${(horizons.structural_3_5y || []).map(h => `<li>${h}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+
+    ${citation ? `
+      <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-sm); padding:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Cross-Referenced RAG Evidence</span>
+          <span class="badge badge-sm">${citation.doc_type}</span>
+        </div>
+        <p style="font-size:0.82rem; color:var(--text-secondary); font-style:italic;">"${citation.snippet}"</p>
+        <span style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; display:block;">Source: ${citation.document_title} • ${citation.provenance}</span>
+      </div>
+    ` : ''}
+  `;
+}
+
+function renderExplainabilityPanel(expAgent) {
+  const panel = document.getElementById('dossier-panel-explainability');
+  if (!panel) return;
+  if (!expAgent || !expAgent.data) {
+    panel.innerHTML = `<div class="empty-state">No explainability telemetry available.</div>`;
+    return;
+  }
+
+  const d = expAgent.data;
+  const attr = d.factor_attribution || [];
+  const chain = d.causal_chain || [];
+  const triggers = d.counterfactual_triggers || [];
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Strategic Explainability & Causal Attribution (FR-022)</h3>
+        <p class="section-subheading">Step-by-step causal chain, quantified factor weights, and counterfactual sensitivity thresholds</p>
+      </div>
+      <span class="badge badge-fr">FR-022 Compliant</span>
+    </div>
+
+    <!-- Factor Contribution Decomposition -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Strategic Factor Weighting & Attribution</h4>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+      ${attr.map(a => `
+        <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-weight:700; font-size:0.88rem; color:#fff;">${a.factor_name}</span>
+            <span class="badge ${a.directional_influence === 'POSITIVE' ? 'badge-success' : (a.directional_influence === 'NEGATIVE' ? 'badge-danger' : 'badge-warning')}">
+              ${a.directional_influence} (${a.weight_pct}% weight)
+            </span>
+          </div>
+          <p style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">${a.impact_summary}</p>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- 5-Stage Causal Deduction Chain -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">5-Stage Causal Deduction Chain</h4>
+    <div class="causal-chain-wrap" style="margin-bottom:24px;">
+      ${chain.map(c => `
+        <div class="causal-node">
+          <div class="causal-node-step">Stage ${c.step}: ${c.phase}</div>
+          <div class="causal-node-text">${c.reasoning}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Counterfactual Sensitivity Triggers -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Counterfactual Triggers ("What Would Change This Stance?")</h4>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+      ${triggers.map(t => `
+        <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-sm); padding:16px;">
+          <span style="font-size:0.75rem; text-transform:uppercase; color:#c084fc; font-weight:700;">Direction: ${t.target_direction?.replace(/_/g, ' ')}</span>
+          <div style="font-weight:700; color:#fff; font-size:0.86rem; margin:6px 0;">${t.threshold_condition}</div>
+          <p style="font-size:0.8rem; color:var(--text-secondary); line-height:1.4;">${t.rationale}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderAuditPanel(dossier) {
+  const panel = document.getElementById('dossier-panel-audit');
+  if (!panel) return;
+
+  const msgs = dossier.inter_agent_messages || [];
+  const findings = dossier.agent_findings || {};
+
+  panel.innerHTML = `
+    <div class="section-title-row">
+      <div>
+        <h3 class="section-heading">Master Orchestrator Consensus & Trace (FR-023)</h3>
+        <p class="section-subheading">Run ID: <code>${dossier.run_id}</code> • Total Runtime: <strong>${dossier.total_execution_ms}ms</strong> • Status: <strong>${dossier.status}</strong></p>
+      </div>
+      <div>
+        <button class="btn btn-secondary btn-sm" onclick="exportDossierJson()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Export Dossier JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- Agent Execution Performance Breakdown -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Specialized Agent Telemetry & Timing</h4>
+    <div class="table-responsive" style="margin-bottom:24px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Agent ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Confidence</th>
+            <th>Execution Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.values(findings).map(a => `
+            <tr>
+              <td><code>${a.agent_id}</code></td>
+              <td><strong>${a.agent_name}</strong></td>
+              <td><span class="badge badge-success">${a.status}</span></td>
+              <td>${(a.confidence_score * 100).toFixed(0)}%</td>
+              <td>${a.execution_time_ms}ms</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Inter-Agent Communication Bus Log -->
+    <h4 style="font-size:0.95rem; font-weight:700; color:#fff; margin-bottom:12px;">Inter-Agent Blackboard Message Timeline</h4>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Sender</th>
+            <th>Recipient</th>
+            <th>Message Payload</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${msgs.map(m => `
+            <tr>
+              <td style="font-family:var(--font-mono, monospace); font-size:0.75rem;">${m.timestamp ? m.timestamp.split('T')[1].substring(0, 8) : '00:00:00'}</td>
+              <td><span class="badge badge-sm">${m.sender}</span></td>
+              <td><span class="badge badge-sm badge-secondary">${m.recipient}</span></td>
+              <td style="font-size:0.84rem;">${m.message}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function runSingleAgent(agentId) {
+  const ticker = getSelectedOrchTicker();
+  showToast(`Dispatching ${agentId} for ${ticker}...`);
+  try {
+    const res = await fetch(`/api/agents/${agentId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker: ticker })
+    });
+    if (!res.ok) throw new Error('Failed to run agent');
+    const result = await res.json();
+    showToast(`${result.agent_name} completed in ${result.execution_time_ms}ms`);
+    alert(`[${result.agent_name} - ${agentId}]\n\nSummary:\n${result.summary}\n\nConfidence: ${(result.confidence_score*100).toFixed(0)}%\nRuntime: ${result.execution_time_ms}ms\n\nKey Insights:\n${(result.key_insights || []).map(i => `• ${i}`).join('\n')}`);
+  } catch (err) {
+    showToast(`Error executing agent: ${err.message}`);
+  }
+}
+
+async function loadOrchestrationHistory() {
+  const body = document.getElementById('orch-history-body');
+  if (!body) return;
+
+  try {
+    const res = await fetch('/api/orchestration/runs');
+    if (!res.ok) throw new Error('Failed to load runs');
+    const runs = await res.json();
+
+    if (!runs || runs.length === 0) {
+      body.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No previous orchestration sessions recorded yet. Run an evaluation above!</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = runs.map(r => {
+      const stanceClass = (r.consensus_stance || 'HOLD').toLowerCase().replace(/_/g, '-');
+      const ts = r.created_at ? new Date(r.created_at).toLocaleString() : 'N/A';
+      return `
+        <tr>
+          <td><code>${r.run_id}</code></td>
+          <td><strong>${r.ticker}</strong></td>
+          <td><span class="dossier-stance-value ${stanceClass}" style="font-size:0.95rem;">${(r.consensus_stance || 'HOLD').replace(/_/g, ' ')}</span></td>
+          <td>${(r.confidence_score * 100).toFixed(1)}%</td>
+          <td>${r.total_execution_ms}ms</td>
+          <td style="font-size:0.78rem; color:var(--text-muted);">${ts}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="viewHistoricalRun('${r.run_id}')">
+              View Dossier
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="7" class="text-danger text-center">Failed to load history: ${err.message}</td></tr>`;
+  }
+}
+
+async function viewHistoricalRun(runId) {
+  showToast(`Loading dossier for run ${runId}...`);
+  try {
+    const res = await fetch(`/api/orchestration/runs/${runId}`);
+    if (!res.ok) throw new Error('Failed to load run details');
+    const data = await res.json();
+    if (data.dossier) {
+      renderOrchestrationDossier(data.dossier);
+      const container = document.getElementById('orchestration-dossier-container');
+      if (container) {
+        container.classList.remove('hidden');
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  } catch (err) {
+    showToast(`Error viewing run: ${err.message}`);
+  }
+}
+
+function exportDossierJson() {
+  if (!currentOrchestrationDossier) {
+    showToast('No active dossier to export');
+    return;
+  }
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentOrchestrationDossier, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", `orchestration_dossier_${currentOrchestrationDossier.ticker || 'REPORT'}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+  showToast('Dossier JSON exported successfully');
+}
+

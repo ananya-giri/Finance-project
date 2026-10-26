@@ -28,6 +28,8 @@ def init_db():
         unstructured_doc,
         document_chunk,
         update_log,
-        market_intelligence
+        market_intelligence,
+        multi_agent
     )
     Base.metadata.create_all(bind=engine)
+

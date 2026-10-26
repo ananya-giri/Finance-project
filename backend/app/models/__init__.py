@@ -5,6 +5,7 @@ from backend.app.models.unstructured_doc import UnstructuredDocument
 from backend.app.models.document_chunk import DocumentChunk
 from backend.app.models.update_log import UpdateLog
 from backend.app.models.market_intelligence import EconomicIndicator, MarketIntelligenceEvent
+from backend.app.models.multi_agent import OrchestrationRun, AgentExecutionTrace
 
 __all__ = [
     "Company",
@@ -14,5 +15,8 @@ __all__ = [
     "DocumentChunk",
     "UpdateLog",
     "EconomicIndicator",
-    "MarketIntelligenceEvent"
+    "MarketIntelligenceEvent",
+    "OrchestrationRun",
+    "AgentExecutionTrace"
 ]
+

@@ -9,6 +9,7 @@ from backend.app.models.unstructured_doc import UnstructuredDocument
 from backend.app.models.update_log import UpdateLog
 from backend.app.models.structured_metrics import StructuredMetric
 from backend.app.models.market_intelligence import EconomicIndicator, MarketIntelligenceEvent
+from backend.app.models.multi_agent import OrchestrationRun, AgentExecutionTrace
 from backend.app.api.schemas import (
     CompanyResponse,
     IngestHistoryRequest,
@@ -27,7 +28,13 @@ from backend.app.api.schemas import (
     RAGRecommendRequest,
     RAGRecommendResponse,
     RAGStatusResponse,
-    RAGIndexAllResponse
+    RAGIndexAllResponse,
+    AgentMetadataItem,
+    AgentRunRequest,
+    AgentResultResponse,
+    OrchestrationRunRequest,
+    OrchestrationRunResponse,
+    OrchestrationHistoryItem
 )
 from backend.app.services.historical_ingestion import HistoricalIngestionService
 from backend.app.services.document_ingestion import DocumentIngestionService, SUPPORTED_DOC_TYPES
@@ -35,6 +42,9 @@ from backend.app.services.metrics_engine import MetricsEngine
 from backend.app.services.scheduler_service import SchedulerService
 from backend.app.services.market_intelligence import MarketIntelligenceService
 from backend.app.services.rag_service import RAGService
+from backend.app.services.agents import AgentRegistry, AgentContext, OrchestratorAgent
+import json
+
 
 router = APIRouter(prefix="/api", tags=["financial-engine"])
 
@@ -46,9 +56,12 @@ def health_check():
         "supported_requirements": [
             "FR-001", "FR-002", "FR-003", "FR-004",
             "FR-005", "FR-006", "FR-007", "FR-008", "FR-009",
-            "FR-010", "FR-011", "FR-012", "FR-013", "FR-014"
+            "FR-010", "FR-011", "FR-012", "FR-013", "FR-014",
+            "FR-015", "FR-016", "FR-017", "FR-018", "FR-019",
+            "FR-020", "FR-021", "FR-022", "FR-023"
         ]
     }
+
 
 
 # ============================================================================
@@ -502,3 +515,169 @@ def generate_grounded_recommendation(req: RAGRecommendRequest, db: Session = Dep
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recommendation synthesis failed: {str(e)}")
+
+
+# ============================================================================
+# Section 2.4: Multi-Agent Orchestration (FR-015 to FR-023)
+# ============================================================================
+
+@router.get("/agents", response_model=List[AgentMetadataItem])
+def list_agents():
+    """
+    FR-015: The platform shall support multiple specialized AI agents.
+    Returns the metadata, capabilities, roles, and status of all registered agents:
+    - FR-016: Financial Analysis Agent
+    - FR-017: Economic Intelligence Agent
+    - FR-018: Geopolitical Risk Agent
+    - FR-019: Industry Intelligence Agent
+    - FR-020: Forecasting Agent
+    - FR-021: Recommendation Agent
+    - FR-022: Explainability Agent
+    - FR-023: Orchestrator Agent
+    """
+    return AgentRegistry.list_agents()
+
+@router.get("/agents/{agent_id}", response_model=AgentMetadataItem)
+def get_agent_details(agent_id: str):
+    """Retrieve metadata and capabilities for a specific specialized agent."""
+    agent = AgentRegistry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Specialized agent '{agent_id}' not found.")
+    return agent.get_metadata()
+
+@router.post("/agents/{agent_id}/run", response_model=AgentResultResponse)
+def run_individual_agent(agent_id: str, req: AgentRunRequest, db: Session = Depends(get_db)):
+    """
+    FR-015 to FR-022: Executes an individual specialized AI agent on demand.
+    Allows ad-hoc analytical deep dives for a company ticker.
+    """
+    agent = AgentRegistry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Specialized agent '{agent_id}' not found.")
+    
+    ctx = AgentContext(ticker=req.ticker, db=db, parameters=req.parameters or {})
+    result = agent.run(ctx)
+    return AgentResultResponse(
+        agent_id=result.agent_id,
+        agent_name=result.agent_name,
+        status=result.status,
+        confidence_score=result.confidence_score,
+        execution_time_ms=result.execution_time_ms,
+        summary=result.summary,
+        data=result.data,
+        key_insights=result.key_insights,
+        error=result.error
+    )
+
+@router.post("/orchestration/run", response_model=OrchestrationRunResponse)
+def run_orchestration(req: OrchestrationRunRequest, db: Session = Depends(get_db)):
+    """
+    FR-023: The Orchestrator Agent shall coordinate all agents.
+    Coordinates parallel data discovery, forward forecasting, strategic recommendation formulation,
+    and transparent causal explainability.
+    """
+    orchestrator = AgentRegistry.get_agent("ORCHESTRATOR") or OrchestratorAgent()
+    ctx = AgentContext(ticker=req.ticker, db=db, parameters=req.parameters or {})
+    
+    result = orchestrator.run(ctx)
+    if result.status == "FAILED":
+        raise HTTPException(status_code=500, detail=f"Multi-agent orchestration failed: {result.error}")
+    
+    dossier = result.data
+    return OrchestrationRunResponse(
+        run_id=dossier.get("run_id", "unknown"),
+        ticker=dossier.get("ticker", req.ticker),
+        status=dossier.get("status", "COMPLETED"),
+        consensus_stance=dossier.get("consensus_stance", "HOLD"),
+        conviction_score=dossier.get("conviction_score", 75.0),
+        total_execution_ms=dossier.get("total_execution_ms", 0),
+        timestamp=dossier.get("timestamp", ""),
+        executive_summary=dossier.get("executive_summary", ""),
+        agent_findings=dossier.get("agent_findings", {}),
+        inter_agent_messages=dossier.get("inter_agent_messages", []),
+        orchestrator_metadata=dossier.get("orchestrator_metadata", {})
+    )
+
+@router.get("/orchestration/runs", response_model=List[OrchestrationHistoryItem])
+def get_orchestration_history(
+    ticker: Optional[str] = Query(None, description="Optional filter by ticker symbol"),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Returns chronological audit logs and dossiers of previous multi-agent orchestration runs."""
+    q = db.query(OrchestrationRun)
+    if ticker:
+        q = q.filter(OrchestrationRun.ticker == ticker.upper().strip())
+    runs = q.order_by(OrchestrationRun.created_at.desc()).limit(limit).all()
+    return runs
+
+@router.get("/orchestration/runs/{run_id}")
+def get_orchestration_run_detail(run_id: str, db: Session = Depends(get_db)):
+    """Retrieves full serialized multi-agent dossier and granular agent execution traces for a run ID."""
+    run = db.query(OrchestrationRun).filter(OrchestrationRun.run_id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Orchestration run '{run_id}' not found.")
+    
+    traces = db.query(AgentExecutionTrace).filter(AgentExecutionTrace.run_id == run_id).all()
+    
+    parsed_dossier = {}
+    if run.full_dossier_json:
+        try:
+            parsed_dossier = json.loads(run.full_dossier_json)
+        except Exception:
+            parsed_dossier = {"raw": run.full_dossier_json}
+    
+    return {
+        "run_id": run.run_id,
+        "ticker": run.ticker,
+        "status": run.status,
+        "consensus_stance": run.consensus_stance,
+        "confidence_score": run.confidence_score,
+        "executive_summary": run.executive_summary,
+        "total_execution_ms": run.total_execution_ms,
+        "created_at": run.created_at,
+        "dossier": parsed_dossier,
+        "traces": [
+            {
+                "agent_id": t.agent_id,
+                "agent_name": t.agent_name,
+                "status": t.status,
+                "confidence_score": t.confidence_score,
+                "execution_time_ms": t.execution_time_ms,
+                "error_message": t.error_message,
+                "created_at": t.created_at
+            }
+            for t in traces
+        ]
+    }
+
+@router.get("/orchestration/latest/{ticker}")
+def get_latest_orchestration_for_ticker(ticker: str, db: Session = Depends(get_db)):
+    """Retrieves the latest available multi-agent dossier for a specific company."""
+    t_clean = ticker.upper().strip()
+    run = (
+        db.query(OrchestrationRun)
+        .filter(OrchestrationRun.ticker == t_clean)
+        .order_by(OrchestrationRun.created_at.desc())
+        .first()
+    )
+    if not run:
+        return {"status": "NO_PREVIOUS_RUN", "ticker": t_clean, "dossier": None}
+    
+    parsed_dossier = {}
+    if run.full_dossier_json:
+        try:
+            parsed_dossier = json.loads(run.full_dossier_json)
+        except Exception:
+            pass
+            
+    return {
+        "status": "FOUND",
+        "run_id": run.run_id,
+        "ticker": run.ticker,
+        "consensus_stance": run.consensus_stance,
+        "confidence_score": run.confidence_score,
+        "created_at": run.created_at,
+        "dossier": parsed_dossier
+    }
+

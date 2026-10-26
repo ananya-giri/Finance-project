@@ -263,3 +263,64 @@ class RAGIndexAllResponse(BaseModel):
     failed_count: int
     total_chunks_stored: int
     details: List[RAGIndexDetailItem]
+
+# ============================================================================
+# Section 2.4: Multi-Agent Orchestration Schemas (FR-015 to FR-023)
+# ============================================================================
+
+class AgentMetadataItem(BaseModel):
+    agent_id: str
+    name: str
+    role: str
+    description: str
+    version: str
+    capabilities: List[str]
+    fr_code: str
+
+class AgentRunRequest(BaseModel):
+    ticker: str = Field(..., description="Target company ticker, e.g. AAPL, TSLA, TCS")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional custom parameters for the agent")
+
+class AgentResultResponse(BaseModel):
+    agent_id: str
+    agent_name: str
+    status: str
+    confidence_score: float
+    execution_time_ms: int
+    summary: str
+    data: Dict[str, Any]
+    key_insights: List[str]
+    error: Optional[str] = None
+
+class OrchestrationRunRequest(BaseModel):
+    ticker: str = Field(..., description="Target ticker symbol to orchestrate across all specialized agents")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional parameters for the orchestrated run")
+
+class OrchestrationRunResponse(BaseModel):
+    run_id: str
+    ticker: str
+    status: str
+    consensus_stance: str
+    conviction_score: float
+    total_execution_ms: int
+    timestamp: str
+    executive_summary: str
+    agent_findings: Dict[str, Any]
+    inter_agent_messages: List[Dict[str, Any]]
+    orchestrator_metadata: Dict[str, Any]
+
+class OrchestrationHistoryItem(BaseModel):
+    id: int
+    run_id: str
+    ticker: str
+    status: str
+    consensus_stance: str
+    confidence_score: float
+    executive_summary: str
+    total_execution_ms: int
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
