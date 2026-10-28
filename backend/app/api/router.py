@@ -1,7 +1,11 @@
-from typing import List, Optional
+from typing import Any, List, Optional, TYPE_CHECKING
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query  # type: ignore
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session  # type: ignore[import-not-found]
+else:
+    Session = Any  # type: ignore[assignment]
 
 from backend.app.database import get_db
 from backend.app.models.company import Company
@@ -41,6 +45,7 @@ from backend.app.services.document_ingestion import DocumentIngestionService, SU
 from backend.app.services.metrics_engine import MetricsEngine
 from backend.app.services.scheduler_service import SchedulerService
 from backend.app.services.market_intelligence import MarketIntelligenceService
+from backend.app.services.impact_assessment import ImpactAssessmentService
 from backend.app.services.rag_service import RAGService
 from backend.app.services.agents import AgentRegistry, AgentContext, OrchestratorAgent
 import json
@@ -324,6 +329,54 @@ def get_market_events(
         query = query.filter(MarketIntelligenceEvent.severity == severity.upper())
 
     return query.order_by(MarketIntelligenceEvent.event_date.desc()).limit(limit).all()
+
+# ============================================================================
+# Section 2.5: Impact Assessment Engine (FR-024)
+# ============================================================================
+
+@router.get("/impact-assessments/events/{event_id}/matches")
+def match_event_to_companies(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    FR-024: Identify potentially affected companies for an external event
+    and retrieve their available financial baselines.
+    """
+    try:
+        return ImpactAssessmentService.match_event_to_companies(
+            db=db,
+            event_id=event_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+# ============================================================================
+# FR-026: Event Financial Impact Calculations
+# ============================================================================
+
+@router.post("/impact-assessments/events/{event_id}/run")
+def run_event_impact_assessment(
+    event_id: int,
+    ticker: Optional[str] = Query(
+        None,
+        description="Optional company ticker, e.g. TSLA or AAPL",
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    FR-026: Calculate and save optimistic, base, and pessimistic
+    financial impact estimates for an external event.
+    """
+    try:
+        return ImpactAssessmentService.calculate_and_save_event_impacts(
+            db=db,
+            event_id=event_id,
+            ticker=ticker,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
 
 @router.post("/market-intelligence/events", response_model=MarketEventItem)
 def create_market_event(req: CreateMarketEventRequest, db: Session = Depends(get_db)):

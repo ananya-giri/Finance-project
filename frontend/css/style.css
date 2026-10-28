@@ -2755,3 +2755,266 @@ body {
   color: var(--text-muted);
 }
 
+/* ============================================================
+   FR-024 to FR-027: IMPACT ASSESSMENT DASHBOARD
+   ============================================================ */
+
+.ia-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  padding: 18px 20px 20px;
+}
+
+.ia-control {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.ia-control .form-input {
+  width: 100%;
+}
+
+.ia-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ia-actions .btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ia-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 20px;
+}
+
+.ia-summary-card {
+  min-width: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.ia-summary-label {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+.ia-summary-value {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ia-summary-note {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.ia-filters {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 0 20px 18px;
+}
+
+.ia-filters .form-group {
+  min-width: 180px;
+  margin-bottom: 0;
+}
+
+.ia-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid var(--border-color);
+}
+
+.ia-table {
+  width: 100%;
+  min-width: 1250px;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.ia-table th,
+.ia-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ia-table th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ia-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ia-muted {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.ia-direction,
+.ia-confidence-pill,
+.ia-quality-pill {
+  display: inline-block;
+  padding: 4px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ia-direction-positive,
+.ia-confidence-high {
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.ia-direction-negative,
+.ia-confidence-low {
+  color: var(--accent-rose);
+  background: rgba(244, 63, 94, 0.1);
+  border-color: rgba(244, 63, 94, 0.25);
+}
+
+.ia-confidence-moderate {
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.ia-direction-neutral,
+.ia-direction-unknown,
+.ia-confidence-unavailable,
+.ia-quality-pill {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ia-confidence-details {
+  min-width: 135px;
+}
+
+.ia-confidence-details summary {
+  color: #a5b4fc;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ia-confidence-panel {
+  min-width: 260px;
+  max-width: 380px;
+  padding: 14px 0;
+  white-space: normal;
+}
+
+.ia-confidence-factor {
+  margin-bottom: 16px;
+}
+
+.ia-factor-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  text-transform: capitalize;
+  font-size: 0.76rem;
+}
+
+.ia-progress-track {
+  height: 6px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 6px;
+}
+
+.ia-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-purple);
+}
+
+.ia-factor-meta {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-bottom: 5px;
+}
+
+.ia-confidence-factor p,
+.ia-confidence-disclaimer {
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.ia-confidence-disclaimer {
+  border-top: 1px solid var(--border-color);
+  padding-top: 10px;
+}
+
+@media (max-width: 1100px) {
+  .ia-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ia-actions {
+    grid-column: 1 / -1;
+  }
+
+  .ia-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .ia-controls {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .ia-actions {
+    grid-column: auto;
+  }
+
+  .ia-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ia-filters {
+    padding: 0 16px 16px;
+  }
+
+  .ia-filters .form-group {
+    width: 100%;
+  }
+}
+

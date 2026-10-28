@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine  # type: ignore[reportMissingImports]
+from sqlalchemy.orm import declarative_base, sessionmaker  # type: ignore[reportMissingImports]
 from backend.app.config import DATABASE_URL
 
 engine = create_engine(
@@ -29,7 +29,9 @@ def init_db():
         document_chunk,
         update_log,
         market_intelligence,
-        multi_agent
+        multi_agent,
+        impact_assessment
     )
-    Base.metadata.create_all(bind=engine)
 
+    # Create any missing database tables
+    Base.metadata.create_all(bind=engine)

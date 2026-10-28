@@ -620,6 +620,19 @@
           Impact Matrix & AI Classifier
           <span class="subtab-tag">FR-009</span>
         </button>
+        
+<button class="intel-subnav-btn"
+        data-subtab="impact-assessment"
+        onclick="switchIntelSubtab('impact-assessment')">
+  <svg width="16" height="16" viewBox="0 0 24 24"
+       fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 3v18h18"/>
+    <path d="m7 14 4-4 4 4 6-8"/>
+  </svg>
+  Impact Assessment
+  <span class="subtab-tag">FR-024–027</span>
+</button>
+
       </div>
 
       <!-- ======================================================== -->
@@ -786,6 +799,132 @@
           </div>
         </div>
       </div>
+      
+<!-- ========================================================= -->
+<!-- SUBVIEW 5: IMPACT ASSESSMENT ENGINE (FR-024 to FR-027)   -->
+<!-- ========================================================= -->
+<div class="intel-subview" id="subview-impact-assessment">
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Impact Assessment Engine</h2>
+        <p class="card-subtitle">
+          FR-024 to FR-027: Estimate event-driven financial impacts
+          and inspect the supporting confidence evidence.
+        </p>
+      </div>
+    </div>
+
+    <div class="ia-controls">
+      <div class="form-group ia-control">
+        <label class="form-label" for="impact-assessment-event">
+          External Event
+        </label>
+        <select id="impact-assessment-event" class="form-input">
+          <option value="">Load events...</option>
+        </select>
+      </div>
+
+      <div class="form-group ia-control">
+        <label class="form-label" for="impact-assessment-ticker">
+          Company Ticker (Optional)
+        </label>
+        <input
+          type="text"
+          id="impact-assessment-ticker"
+          class="form-input"
+          placeholder="e.g. TSLA"
+          maxlength="20"
+        />
+      </div>
+
+      <div class="ia-actions">
+        <button class="btn btn-secondary"
+                onclick="loadImpactAssessmentEvents(true)">
+          Refresh Events
+        </button>
+
+        <button class="btn btn-primary"
+                id="btn-run-impact-assessment"
+                onclick="runImpactAssessment()">
+          Run Assessment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="impact-assessment-status"
+       class="result-box hidden"
+       role="status"
+       aria-live="polite"></div>
+
+  <div id="impact-assessment-summary"
+       class="ia-summary-grid"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Financial Impact Results</h2>
+        <p class="card-subtitle">
+          Compare estimated changes, projected values and impact confidence.
+        </p>
+      </div>
+    </div>
+
+    <div class="ia-filters">
+      <div class="form-group">
+        <label class="form-label" for="ia-filter-metric">Metric</label>
+        <select id="ia-filter-metric" class="form-input"
+                onchange="renderImpactAssessmentResults()">
+          <option value="ALL">All Metrics</option>
+          <option value="REVENUE">Revenue</option>
+          <option value="EBITDA">EBITDA</option>
+          <option value="PROFITABILITY">Profitability</option>
+          <option value="COSTS">Costs</option>
+          <option value="CASH_FLOW">Cash Flow</option>
+          <option value="MARKET_SHARE">Market Share</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="ia-filter-scenario">Scenario</label>
+        <select id="ia-filter-scenario" class="form-input"
+                onchange="renderImpactAssessmentResults()">
+          <option value="ALL">All Scenarios</option>
+          <option value="OPTIMISTIC">Optimistic</option>
+          <option value="BASE">Base</option>
+          <option value="PESSIMISTIC">Pessimistic</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="ia-no-results" class="empty-state">
+      <p>Select an event and click Run Assessment to view the results.</p>
+    </div>
+
+    <div class="ia-table-scroll hidden" id="ia-table-container">
+      <table class="ia-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Metric</th>
+            <th>Scenario</th>
+            <th>Baseline</th>
+            <th>Estimated Change</th>
+            <th>Projected Value</th>
+            <th>Direction</th>
+            <th>Confidence</th>
+            <th>Data Quality</th>
+            <th>Confidence Details</th>
+          </tr>
+        </thead>
+        <tbody id="impact-assessment-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
     </section>
 
     <!-- ===================================================================== -->

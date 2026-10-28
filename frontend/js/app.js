@@ -634,6 +634,9 @@ function showToast(msg) {
 // ============================================================================
 
 let currentIntelSubtab = 'indicators';
+let cachedImpactAssessmentEvents = [];
+let latestImpactAssessmentResult = null;
+let impactCompanyLookup = {};
 let cachedIndicators = [];
 let cachedEvents = [];
 let cachedNews = [];
@@ -663,6 +666,9 @@ function switchIntelSubtab(subtabId) {
   if (subtabId === 'geopolitical') loadMarketEvents(currentGeoType, currentGeoSeverity);
   if (subtabId === 'news') loadMarketNews();
   if (subtabId === 'classifier') loadImpactMatrix();
+  if (subtabId === 'impact-assessment') {
+  loadImpactAssessmentEvents();
+}
 }
 
 async function loadMarketIntelligence() {
@@ -2753,5 +2759,397 @@ function exportDossierJson() {
   downloadAnchor.click();
   downloadAnchor.remove();
   showToast('Dossier JSON exported successfully');
+}
+
+/* ============================================================
+   FR-024 to FR-027: IMPACT ASSESSMENT DASHBOARD
+   ============================================================ */
+
+function escapeImpactHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
+function setImpactAssessmentStatus(message, type = 'success') {
+  const status = document.getElementById('impact-assessment-status');
+  if (!status) return;
+
+  status.textContent = message;
+  status.className = `result-box ${type}`;
+}
+
+async function loadImpactAssessmentEvents(force = false) {
+  const select = document.getElementById('impact-assessment-event');
+  if (!select) return;
+
+  if (cachedImpactAssessmentEvents.length > 0 && !force) {
+    return;
+  }
+
+  const previousValue = select.value;
+  select.innerHTML = '<option value="">Loading events...</option>';
+
+  try {
+    const response = await fetch('/api/market-intelligence/events?limit=200');
+
+    if (!response.ok) {
+      throw new Error('Unable to load market intelligence events.');
+    }
+
+    const events = await response.json();
+    cachedImpactAssessmentEvents = Array.isArray(events) ? events : [];
+
+    if (cachedImpactAssessmentEvents.length === 0) {
+      select.innerHTML = '<option value="">No events available</option>';
+      setImpactAssessmentStatus(
+        'No external events were found. Register an event first.',
+        'error'
+      );
+      return;
+    }
+
+    select.innerHTML = `
+      <option value="">Select an event...</option>
+      ${cachedImpactAssessmentEvents.map(event => `
+        <option value="${escapeImpactHtml(event.id)}">
+          #${escapeImpactHtml(event.id)} —
+          ${escapeImpactHtml(event.title || 'Untitled event')}
+          (${escapeImpactHtml(event.severity || 'UNKNOWN')})
+        </option>
+      `).join('')}
+    `;
+
+    const previousStillExists = cachedImpactAssessmentEvents.some(
+      event => String(event.id) === previousValue
+    );
+
+    select.value = previousStillExists
+      ? previousValue
+      : String(cachedImpactAssessmentEvents[0].id);
+
+  } catch (error) {
+    select.innerHTML = '<option value="">Unable to load events</option>';
+    setImpactAssessmentStatus(error.message, 'error');
+  }
+}
+
+async function runImpactAssessment() {
+  const eventSelect = document.getElementById('impact-assessment-event');
+  const tickerInput = document.getElementById('impact-assessment-ticker');
+  const runButton = document.getElementById('btn-run-impact-assessment');
+
+  if (!eventSelect || !eventSelect.value) {
+    setImpactAssessmentStatus('Please select an external event.', 'error');
+    return;
+  }
+
+  const eventId = eventSelect.value;
+  const ticker = tickerInput ? tickerInput.value.trim().toUpperCase() : '';
+
+  if (ticker && !/^[A-Z0-9.-]{1,20}$/.test(ticker)) {
+    setImpactAssessmentStatus('Please enter a valid company ticker.', 'error');
+    return;
+  }
+
+  if (runButton) runButton.disabled = true;
+
+  setImpactAssessmentStatus(
+    'Running impact calculations and retrieving confidence evidence...',
+    'success'
+  );
+
+  try {
+    // Retrieve company-match details for readable company names.
+    impactCompanyLookup = {};
+
+    try {
+      const matchResponse = await fetch(
+        `/api/impact-assessments/events/${encodeURIComponent(eventId)}/matches`
+      );
+
+      if (matchResponse.ok) {
+        const matchData = await matchResponse.json();
+
+        (matchData.matches || []).forEach(match => {
+          impactCompanyLookup[String(match.company_id)] =
+            `${match.company_name || 'Company'} (${match.ticker || 'N/A'})`;
+        });
+      }
+    } catch (matchError) {
+      console.warn('Could not load company-match labels:', matchError);
+    }
+
+    // Run and save the assessment.
+    const query = ticker
+      ? `?ticker=${encodeURIComponent(ticker)}`
+      : '';
+
+    const response = await fetch(
+      `/api/impact-assessments/events/${encodeURIComponent(eventId)}/run${query}`,
+      { method: 'POST' }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || 'The impact assessment request failed.'
+      );
+    }
+
+    latestImpactAssessmentResult = data;
+
+    renderImpactAssessmentSummary();
+    renderImpactAssessmentResults();
+
+    const calculated = data.calculated_records ?? 0;
+    const total = data.assessment_records_created ?? 0;
+
+    const isPartial = data.status === 'PARTIAL_SUCCESS';
+
+    setImpactAssessmentStatus(
+      `${data.status}: ${calculated} of ${total} assessment records have numerical estimates. ` +
+      `${data.companies_assessed ?? 0} companies assessed. ` +
+      'Scenario impacts and confidence scores are heuristic estimates, not validated forecasts.',
+      isPartial ? 'success' : (
+        data.status === 'SUCCESS' ? 'success' : 'error'
+      )
+    );
+
+  } catch (error) {
+    setImpactAssessmentStatus(error.message, 'error');
+  } finally {
+    if (runButton) runButton.disabled = false;
+  }
+}
+
+function formatImpactValue(value, unit) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return '—';
+  }
+
+  const numericValue = Number(value).toLocaleString(undefined, {
+    maximumFractionDigits: 2
+  });
+
+  if (unit === 'percentage_points') {
+    return `${numericValue} pp`;
+  }
+
+  return unit
+    ? `${escapeImpactHtml(unit)} ${numericValue}`
+    : numericValue;
+}
+
+function renderImpactAssessmentSummary() {
+  const container = document.getElementById('impact-assessment-summary');
+  const result = latestImpactAssessmentResult;
+
+  if (!container || !result) return;
+
+  const assessments = result.assessments || [];
+
+  const calculated = assessments.filter(
+    item => item.estimated_change !== null &&
+            item.estimated_change !== undefined
+  );
+
+  const scores = calculated
+    .map(item => Number(item.confidence_score))
+    .filter(score => Number.isFinite(score));
+
+  const averageConfidence = scores.length
+    ? `${(scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)}/100`
+    : 'N/A';
+
+  const cards = [
+    {
+      label: 'Companies Assessed',
+      value: result.companies_assessed ?? 0,
+      note: 'Matched to the selected event'
+    },
+    {
+      label: 'Assessment Records',
+      value: result.assessment_records_created ?? assessments.length,
+      note: 'Metric and scenario combinations'
+    },
+    {
+      label: 'Numerical Estimates',
+      value: result.calculated_records ?? calculated.length,
+      note: 'With an available baseline'
+    },
+    {
+      label: 'Average Impact Confidence',
+      value: averageConfidence,
+      note: 'Heuristic evidence score, not probability'
+    }
+  ];
+
+  container.innerHTML = cards.map(card => `
+    <div class="ia-summary-card">
+      <div class="ia-summary-label">${escapeImpactHtml(card.label)}</div>
+      <div class="ia-summary-value">${escapeImpactHtml(card.value)}</div>
+      <div class="ia-summary-note">${escapeImpactHtml(card.note)}</div>
+    </div>
+  `).join('');
+}
+
+function renderImpactConfidenceDetails(assessment) {
+  const factors = assessment.confidence_factors;
+  const components = factors?.components;
+
+  if (!components) {
+    return '<span class="ia-muted">Confidence breakdown unavailable.</span>';
+  }
+
+  const componentHtml = Object.entries(components).map(([name, factor]) => {
+    const score = Number(factor.score);
+    const weight = Number(factor.weight);
+
+    return `
+      <div class="ia-confidence-factor">
+        <div class="ia-factor-heading">
+          <strong>${escapeImpactHtml(name.replace(/_/g, ' '))}</strong>
+          <span>${Number.isFinite(score) ? score.toFixed(1) : 'N/A'}/100</span>
+        </div>
+        <div class="ia-progress-track">
+          <div class="ia-progress-fill"
+               style="width:${Number.isFinite(score) ? Math.max(0, Math.min(score, 100)) : 0}%">
+          </div>
+        </div>
+        <div class="ia-factor-meta">
+          Weight: ${Number.isFinite(weight) ? (weight * 100).toFixed(0) : 0}%
+        </div>
+        <p>${escapeImpactHtml(factor.detail || 'No explanation available.')}</p>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <details class="ia-confidence-details">
+      <summary>View breakdown</summary>
+      <div class="ia-confidence-panel">
+        ${componentHtml}
+        <p class="ia-confidence-disclaimer">
+          ${escapeImpactHtml(
+            factors.interpretation ||
+            'This is a heuristic score, not a calibrated probability.'
+          )}
+        </p>
+      </div>
+    </details>
+  `;
+}
+
+function renderImpactAssessmentResults() {
+  const container = document.getElementById('ia-table-container');
+  const tbody = document.getElementById('impact-assessment-tbody');
+  const emptyState = document.getElementById('ia-no-results');
+
+  if (!container || !tbody || !emptyState) return;
+
+  const assessments = latestImpactAssessmentResult?.assessments || [];
+
+  const metricFilter =
+    document.getElementById('ia-filter-metric')?.value || 'ALL';
+
+  const scenarioFilter =
+    document.getElementById('ia-filter-scenario')?.value || 'ALL';
+
+  const rows = assessments.filter(item =>
+    (metricFilter === 'ALL' || item.metric_name === metricFilter) &&
+    (scenarioFilter === 'ALL' || item.scenario === scenarioFilter)
+  );
+
+  if (rows.length === 0) {
+    container.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    emptyState.innerHTML = `
+      <p>${assessments.length
+        ? 'No assessment records match the selected filters.'
+        : 'No assessment results yet. Select an event and run an assessment.'}</p>
+    `;
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  container.classList.remove('hidden');
+
+  tbody.innerHTML = rows.map(item => {
+    const companyLabel =
+      impactCompanyLookup[String(item.company_id)] ||
+      `Company ID ${item.company_id}`;
+
+    const confidence = item.confidence_score;
+    const hasConfidence =
+      confidence !== null &&
+      confidence !== undefined &&
+      Number.isFinite(Number(confidence));
+
+    const level = item.confidence_level || 'INSUFFICIENT_DATA';
+    const safeLevel = ['HIGH', 'MODERATE', 'LOW'].includes(level)
+      ? level.toLowerCase()
+      : 'unavailable';
+
+    const direction = item.direction || 'UNKNOWN';
+    const safeDirection = ['POSITIVE', 'NEGATIVE', 'NEUTRAL'].includes(direction)
+      ? direction.toLowerCase()
+      : 'unknown';
+
+    const estimatedChange = formatImpactValue(
+      item.estimated_change,
+      item.unit
+    );
+
+    const changePct = item.estimated_change_pct;
+    const changeDetails = changePct !== null && changePct !== undefined
+      ? `<div class="ia-muted">${Number(changePct).toFixed(2)}% relative change</div>`
+      : '';
+
+    const baseline = formatImpactValue(item.baseline_value, item.unit);
+    const projected = formatImpactValue(item.projected_value, item.unit);
+
+    return `
+      <tr>
+        <td>${escapeImpactHtml(companyLabel)}</td>
+        <td>${escapeImpactHtml(item.metric_name || '—')}</td>
+        <td>${escapeImpactHtml(item.scenario || '—')}</td>
+        <td>${baseline}</td>
+        <td>
+          ${estimatedChange}
+          ${changeDetails}
+        </td>
+        <td>${projected}</td>
+        <td>
+          <span class="ia-direction ia-direction-${safeDirection}">
+            ${escapeImpactHtml(direction)}
+          </span>
+        </td>
+        <td>
+          ${
+            hasConfidence
+              ? `<strong>${Number(confidence).toFixed(1)}/100</strong>`
+              : '<span class="ia-muted">N/A</span>'
+          }
+          <div>
+            <span class="ia-confidence-pill ia-confidence-${safeLevel}">
+              ${escapeImpactHtml(level.replace(/_/g, ' '))}
+            </span>
+          </div>
+        </td>
+        <td>
+          <span class="ia-quality-pill">
+            ${escapeImpactHtml(item.data_quality || 'UNKNOWN')}
+          </span>
+        </td>
+        <td>${renderImpactConfidenceDetails(item)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
