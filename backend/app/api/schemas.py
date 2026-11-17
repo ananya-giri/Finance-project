@@ -20,6 +20,214 @@ class CompanyResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================
+
+class PredictionExplainRequest(BaseModel):
+    ticker: str = Field(..., description="Target ticker symbol (e.g. AAPL, TSLA)")
+    forecast_type: str = Field("REVENUE", description="REVENUE, EBITDA, PROFIT, CASH_FLOW, DEMAND")
+    horizon: str = Field("ANNUAL", description="QUARTERLY, ANNUAL, THREE_YEAR, FIVE_YEAR")
+
+class ShapFeatureItem(BaseModel):
+    feature: str
+    display_name: str
+    feature_value: float
+    shap_value: float
+    absolute_importance: float
+    directional_influence: str
+    impact_description: str
+
+class TraceabilityCitationItem(BaseModel):
+    document_id: Any
+    document_title: str
+    document_type: str
+    fiscal_period: str
+    page_number: int
+    sha256_hash: str
+    excerpt: str
+    provenance_status: str
+    attribution_weight: float
+
+class PredictionExplainResponse(BaseModel):
+    explain_id: str
+    ticker: str
+    target_type: str
+    forecast_type: str
+    horizon: str
+    base_value: float
+    top_driver: str
+    feature_importance: List[ShapFeatureItem]
+    narrative_explanation: str
+    traceability_sources: List[TraceabilityCitationItem]
+    confidence_score: float
+    created_at: str
+
+class RecommendationDriverItem(BaseModel):
+    pillar: str
+    key_driver: str
+    driver_value: str
+    directional_weight: str
+    weight_pct: float
+    rationale: str
+
+class RecommendationExplainResponse(BaseModel):
+    explain_id: str
+    ticker: str
+    target_type: str
+    key_drivers: List[RecommendationDriverItem]
+    narrative_explanation: str
+    traceability_sources: List[TraceabilityCitationItem]
+    confidence_score: float
+    created_at: str
+
+class TraceabilityMapResponse(BaseModel):
+    ticker: str
+    total_documents: int
+    citations: List[TraceabilityCitationItem]
+
+class PredictionRunRequest(BaseModel):
+    ticker: str
+    forecast_type: str = "REVENUE"  # REVENUE, EBITDA, PROFIT, CASH_FLOW, DEMAND
+    horizon: str = "ANNUAL"         # QUARTERLY, ANNUAL, THREE_YEAR, FIVE_YEAR
+
+class ModelPerformance(BaseModel):
+    model: str
+    rmse: Optional[float] = None
+    mae: Optional[float] = None
+    mape: Optional[float] = None
+    status: str
+    is_best: Optional[bool] = False
+
+class PredictionRunResponse(BaseModel):
+    run_id: str
+    ticker: str
+    forecast_type: str
+    horizon: str
+    best_model: Optional[str] = None
+    best_mape: Optional[float] = None
+    models: List[ModelPerformance]
+    historical: List[dict]
+    forecasts: dict
+    status: str
+
+class RetrainRequest(BaseModel):
+    ticker: str
+
+class PredictionHistoryItem(BaseModel):
+    run_id: str
+    ticker: str
+    forecast_type: str
+    horizon: str
+    best_model: Optional[str] = None
+    best_mape: Optional[float] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Section 2.7: Scenario Analysis Schemas (FR-034 to FR-036)
+# ============================================================================
+
+class ScenarioRunRequest(BaseModel):
+    ticker: str = Field(..., description="Target ticker symbol (e.g. AAPL, TSLA)")
+    scenario_type: str = Field(..., description="CURRENCY_FLUCTUATION, TARIFF_INCREASE, INTEREST_RATE_CHANGE, SUPPLY_CHAIN_DISRUPTION, MARKET_DOWNTURN")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Scenario-specific shock parameters")
+
+class MetricShockItem(BaseModel):
+    baseline: float
+    delta: float
+    post_scenario: float
+    change_pct: float
+
+class QuantitativeImpactSummary(BaseModel):
+    revenue: MetricShockItem
+    ebitda: MetricShockItem
+    net_profit: MetricShockItem
+    operating_cash_flow: MetricShockItem
+    free_cash_flow: MetricShockItem
+    eps: MetricShockItem
+    overall_impact_severity: str
+
+class RiskMitigationItem(BaseModel):
+    horizon: str
+    action: str
+
+class ScenarioRunResponse(BaseModel):
+    run_id: str
+    ticker: str
+    scenario_type: str
+    scenario_name: str
+    parameters: Dict[str, Any]
+    baseline: Dict[str, Any]
+    impacts: QuantitativeImpactSummary
+    narrative_analysis: str
+    risk_mitigations: List[RiskMitigationItem]
+    confidence_score: float
+    created_at: str
+    status: str
+
+class ScenarioHistoryItem(BaseModel):
+    run_id: str
+    ticker: str
+    scenario_type: str
+    scenario_name: str
+    parameters: Dict[str, Any]
+    impacts: Dict[str, Any]
+    confidence_score: float
+    created_at: str
+    status: str
+
+
+# ============================================================================
+# Section 2.8: Recommendation Generation Schemas (FR-037 to FR-040)
+# ============================================================================
+
+class RecommendationGenerateRequest(BaseModel):
+    ticker: str = Field(..., description="Target company ticker, e.g. AAPL, TSLA, TCS")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional strategic focus constraints")
+
+class RecommendationItem(BaseModel):
+    id: str
+    category: str
+    category_name: str
+    title: str
+    priority: str
+    priority_score: float
+    priority_rank: int
+    timeframe: str
+    expected_impact: str
+    action_steps: List[str]
+    supporting_metrics: Dict[str, Any]
+    justification: str
+
+class RecommendationReportResponse(BaseModel):
+    report_id: str
+    ticker: str
+    title: str
+    executive_summary: str
+    recommendations: List[RecommendationItem]
+    total_recommendations: int
+    top_priority_category: str
+    methodology: str
+    confidence_score: float
+    created_at: str
+    status: str
+
+class RecommendationHistoryItem(BaseModel):
+    report_id: str
+    ticker: str
+    title: str
+    total_recommendations: int
+    top_priority_category: Optional[str] = None
+    confidence_score: float
+    created_at: str
+    status: str
+
 class IngestHistoryRequest(BaseModel):
     ticker: str = Field(..., description="Stock ticker symbol, e.g. AAPL, MSFT, TSLA")
     minimum_years: int = Field(5, description="Minimum historical years to ingest (FR-001)")
@@ -65,6 +273,11 @@ class DocumentItem(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================
+
 class UpdateLogItem(BaseModel):
     id: int
     ticker: Optional[str] = None
@@ -77,6 +290,11 @@ class UpdateLogItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================
 
 class SchedulerStatusResponse(BaseModel):
     scheduler_active: bool
@@ -108,6 +326,11 @@ class EconomicIndicatorItem(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================
+
 class MarketEventItem(BaseModel):
     id: int
     title: str
@@ -126,6 +349,11 @@ class MarketEventItem(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================
 
 class CreateMarketEventRequest(BaseModel):
     title: str
@@ -324,3 +552,7 @@ class OrchestrationHistoryItem(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Schemas (FR-041 to FR-044)
+# ============================================================================

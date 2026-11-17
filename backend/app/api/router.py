@@ -10,6 +10,10 @@ from backend.app.models.update_log import UpdateLog
 from backend.app.models.structured_metrics import StructuredMetric
 from backend.app.models.market_intelligence import EconomicIndicator, MarketIntelligenceEvent
 from backend.app.models.multi_agent import OrchestrationRun, AgentExecutionTrace
+from backend.app.models.predictions import PredictionRun, ModelRegistry
+from backend.app.models.scenario import ScenarioRun
+from backend.app.models.recommendations import StrategicRecommendationReport
+from backend.app.models.explainability import ExplainabilityRun
 from backend.app.api.schemas import (
     CompanyResponse,
     IngestHistoryRequest,
@@ -34,7 +38,21 @@ from backend.app.api.schemas import (
     AgentResultResponse,
     OrchestrationRunRequest,
     OrchestrationRunResponse,
-    OrchestrationHistoryItem
+    OrchestrationHistoryItem,
+    PredictionRunRequest,
+    PredictionRunResponse,
+    RetrainRequest,
+    PredictionHistoryItem,
+    ScenarioRunRequest,
+    ScenarioRunResponse,
+    ScenarioHistoryItem,
+    RecommendationGenerateRequest,
+    RecommendationReportResponse,
+    RecommendationHistoryItem,
+    PredictionExplainRequest,
+    PredictionExplainResponse,
+    RecommendationExplainResponse,
+    TraceabilityMapResponse
 )
 from backend.app.services.historical_ingestion import HistoricalIngestionService
 from backend.app.services.document_ingestion import DocumentIngestionService, SUPPORTED_DOC_TYPES
@@ -43,6 +61,10 @@ from backend.app.services.scheduler_service import SchedulerService
 from backend.app.services.market_intelligence import MarketIntelligenceService
 from backend.app.services.rag_service import RAGService
 from backend.app.services.agents import AgentRegistry, AgentContext, OrchestratorAgent
+from backend.app.services.prediction_engine import PredictionEngine
+from backend.app.services.scenario_analysis import ScenarioAnalysisEngine
+from backend.app.services.recommendation_service import RecommendationService
+from backend.app.services.explainability_engine import ExplainabilityEngine
 import json
 
 
@@ -58,7 +80,11 @@ def health_check():
             "FR-005", "FR-006", "FR-007", "FR-008", "FR-009",
             "FR-010", "FR-011", "FR-012", "FR-013", "FR-014",
             "FR-015", "FR-016", "FR-017", "FR-018", "FR-019",
-            "FR-020", "FR-021", "FR-022", "FR-023"
+            "FR-020", "FR-021", "FR-022", "FR-023",
+            "FR-028", "FR-029", "FR-030", "FR-031", "FR-032", "FR-033",
+            "FR-034", "FR-035", "FR-036",
+            "FR-037", "FR-038", "FR-039", "FR-040",
+            "FR-041", "FR-042", "FR-043", "FR-044"
         ]
     }
 
@@ -651,6 +677,26 @@ def get_orchestration_run_detail(run_id: str, db: Session = Depends(get_db)):
         ]
     }
 
+@router.post("/crewai/run")
+def run_crewai_analysis(req: OrchestrationRunRequest, db: Session = Depends(get_db)):
+    """
+    CrewAI multi-agent analysis using LangChain tools and Gemini LLM.
+    FR-015 to FR-023: Advanced agent orchestration with real LLM reasoning.
+
+    Runs four specialized AI agents sequentially:
+    - Senior Financial Analyst (FR-016)
+    - Market Intelligence Specialist (FR-017, FR-018)
+    - Quantitative Forecasting Expert (FR-020)
+    - Strategic Investment Advisor (FR-021, FR-022)
+
+    Requires GOOGLE_API_KEY to be set in backend/.env
+    """
+    from backend.app.services.crewai_orchestrator import FinancialCrewOrchestrator
+    orchestrator = FinancialCrewOrchestrator()
+    result = orchestrator.run_analysis(ticker=req.ticker, db=db)
+    return result
+
+
 @router.get("/orchestration/latest/{ticker}")
 def get_latest_orchestration_for_ticker(ticker: str, db: Session = Depends(get_db)):
     """Retrieves the latest available multi-agent dossier for a specific company."""
@@ -680,4 +726,257 @@ def get_latest_orchestration_for_ticker(ticker: str, db: Session = Depends(get_d
         "created_at": run.created_at,
         "dossier": parsed_dossier
     }
+
+
+# ============================================================================
+# Section 2.6: Predictive Analytics (FR-028 to FR-033)
+# ============================================================================
+
+@router.post("/predictions/run", response_model=PredictionRunResponse)
+def run_prediction_endpoint(req: PredictionRunRequest, db: Session = Depends(get_db)):
+    """
+    FR-028: Predict future business performance.
+    FR-029: REVENUE, EBITDA, PROFIT, CASH_FLOW, DEMAND forecasts.
+    FR-030: Horizons: QUARTERLY, ANNUAL, THREE_YEAR, FIVE_YEAR.
+    FR-031: Multiple ML forecasting models (Prophet, ARIMA, XGBoost, Linear).
+    FR-032: Automatic model comparison by MAPE & RMSE.
+    """
+    try:
+        result = PredictionEngine.run_prediction(
+            db=db,
+            ticker=req.ticker,
+            forecast_type=req.forecast_type,
+            horizon=req.horizon
+        )
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction run failed: {str(e)}")
+
+@router.get("/predictions/{ticker}", response_model=List[PredictionHistoryItem])
+def get_prediction_history(ticker: str, limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+    """FR-028: Lists past ML prediction runs for a company ticker."""
+    runs = (
+        db.query(PredictionRun)
+        .filter(PredictionRun.ticker == ticker.upper())
+        .order_by(PredictionRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return runs
+
+@router.get("/predictions/run/{run_id}")
+def get_prediction_run_detail(run_id: str, db: Session = Depends(get_db)):
+    """Retrieves full model comparison, historical points, and multi-model forecast curves."""
+    run = db.query(PredictionRun).filter(PredictionRun.run_id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Prediction run '{run_id}' not found.")
+    return {
+        "run_id": run.run_id,
+        "ticker": run.ticker,
+        "forecast_type": run.forecast_type,
+        "horizon": run.horizon,
+        "best_model": run.best_model,
+        "best_mape": run.best_mape,
+        "models": json.loads(run.models_json),
+        "historical": json.loads(run.historical_json),
+        "forecasts": json.loads(run.forecasts_json),
+        "status": run.status,
+        "created_at": run.created_at.isoformat(),
+        "is_retrained": run.is_retrained,
+        "retrained_at": run.retrained_at.isoformat() if run.retrained_at else None
+    }
+
+@router.post("/predictions/retrain/{ticker}")
+def retrain_models_endpoint(ticker: str, db: Session = Depends(get_db)):
+    """
+    FR-033: Retrains prediction models across all metrics using latest financial data.
+    Updates model registry and logs audit timestamps.
+    """
+    try:
+        return PredictionEngine.retrain_models(db=db, ticker=ticker)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Model retraining failed: {str(e)}")
+
+
+# ============================================================================
+# Section 2.7: Scenario Analysis (FR-034 to FR-036)
+# ============================================================================
+
+@router.get("/scenarios/types")
+def get_scenario_types():
+    """
+    FR-034 & FR-035: Lists all 5 supported what-if simulation types with parameter schemas:
+    - CURRENCY_FLUCTUATION
+    - TARIFF_INCREASE
+    - INTEREST_RATE_CHANGE
+    - SUPPLY_CHAIN_DISRUPTION
+    - MARKET_DOWNTURN
+    """
+    return ScenarioAnalysisEngine.get_supported_types()
+
+@router.post("/scenarios/run", response_model=ScenarioRunResponse)
+def run_scenario_endpoint(req: ScenarioRunRequest, db: Session = Depends(get_db)):
+    """
+    FR-034: What-If Analysis Engine.
+    FR-035: Simulates currency fluctuations, tariffs, interest rates, supply chain, market downturns.
+    FR-036: Estimates quantitative financial impact (Revenue, EBITDA, Profit, Cash Flow, EPS).
+    Uses ChromaDB RAG and LangChain / Google LLM for strategic narrative synthesis.
+    """
+    try:
+        return ScenarioAnalysisEngine.run_scenario(
+            db=db,
+            ticker=req.ticker,
+            scenario_type=req.scenario_type,
+            parameters=req.parameters
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scenario analysis failed: {str(e)}")
+
+@router.get("/scenarios/{ticker}", response_model=List[ScenarioHistoryItem])
+def list_company_scenarios(ticker: str, limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+    """FR-034: Lists historical what-if simulations executed for a company ticker."""
+    return ScenarioAnalysisEngine.list_scenarios(db=db, ticker=ticker, limit=limit)
+
+@router.get("/scenarios/run/{run_id}")
+def get_scenario_run_detail(run_id: str, db: Session = Depends(get_db)):
+    """FR-036: Granular quantitative shock matrix and LLM narrative for a specific scenario simulation."""
+    res = ScenarioAnalysisEngine.get_scenario(db=db, run_id=run_id)
+    if not res:
+        raise HTTPException(status_code=404, detail=f"Scenario run '{run_id}' not found.")
+    return res
+
+
+# ============================================================================
+# Section 2.8: Recommendation Generation (FR-037 to FR-040)
+# ============================================================================
+
+@router.post("/recommendations/generate", response_model=RecommendationReportResponse)
+def generate_recommendations_endpoint(req: RecommendationGenerateRequest, db: Session = Depends(get_db)):
+    """
+    FR-037: The platform shall generate strategic recommendations.
+    FR-038: Comprehensive 6-Pillar recommendations:
+      - Cost Optimization
+      - Investment Prioritization
+      - Risk Mitigation
+      - Market Expansion
+      - Pricing Strategies
+      - Capital Allocation
+    FR-039: Ranked by priority score (High, Medium, Low / 0-100).
+    FR-040: Data-grounded financial justifications powered by LangChain + ChromaDB RAG.
+    """
+    try:
+        return RecommendationService.generate_recommendations(
+            db=db,
+            ticker=req.ticker,
+            context_params=req.parameters
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Strategic recommendation generation failed: {str(e)}")
+
+@router.get("/recommendations/{ticker}", response_model=List[RecommendationHistoryItem])
+def list_company_recommendations(ticker: str, limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+    """FR-037: List chronological strategic recommendation dossiers for a company."""
+    return RecommendationService.list_reports(db=db, ticker=ticker, limit=limit)
+
+@router.get("/recommendations/report/{report_id}")
+def get_recommendation_report_detail(report_id: str, db: Session = Depends(get_db)):
+    """FR-037 to FR-040: Retrieves full strategic blueprint, executive summary, and 6-pillar action items."""
+    report = RecommendationService.get_report(db=db, report_id=report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Recommendation report '{report_id}' not found.")
+    return report
+
+@router.get("/recommendations/latest/{ticker}")
+def get_latest_recommendation_endpoint(ticker: str, db: Session = Depends(get_db)):
+    """FR-037: Retrieves the most recent strategic recommendations for a company."""
+    report = RecommendationService.get_latest_report(db=db, ticker=ticker)
+    if not report:
+        return {"status": "NO_PREVIOUS_REPORT", "ticker": ticker.upper(), "report": None}
+    return {"status": "FOUND", "report": report}
+
+
+# ============================================================================
+# Section 2.9: Explainable AI & SHAP Attribution (FR-041 to FR-044)
+# ============================================================================
+
+@router.post("/explainability/prediction", response_model=PredictionExplainResponse)
+def explain_prediction_endpoint(req: PredictionExplainRequest, db: Session = Depends(get_db)):
+    """
+    FR-041: The system shall provide explainability for predictions.
+    FR-043: The system shall support SHAP-based feature importance explanations.
+    FR-044: The system shall provide traceability to source documents.
+    Computes exact TreeExplainer / LinearExplainer SHAP values across 7 macro/financial features.
+    """
+    try:
+        return ExplainabilityEngine.explain_prediction(
+            db=db,
+            ticker=req.ticker,
+            forecast_type=req.forecast_type,
+            horizon=req.horizon
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction explainability failed: {str(e)}")
+
+@router.post("/explainability/recommendation", response_model=RecommendationExplainResponse)
+def explain_recommendations_endpoint(req: PredictionExplainRequest, db: Session = Depends(get_db)):
+    """
+    FR-042: The system shall identify key drivers influencing recommendations.
+    FR-044: The system shall provide traceability to source documents.
+    Decomposes decision weights, financial thresholds, and primary SEC source citations.
+    """
+    try:
+        return ExplainabilityEngine.explain_recommendations(db=db, ticker=req.ticker)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommendation explainability failed: {str(e)}")
+
+@router.get("/explainability/traceability/{ticker}", response_model=TraceabilityMapResponse)
+def get_source_traceability_endpoint(ticker: str, db: Session = Depends(get_db)):
+    """
+    FR-044: The system shall provide traceability to source documents.
+    Returns verifiable primary source filings, extracted excerpts, page numbers, and SHA-256 hashes.
+    """
+    try:
+        citations = ExplainabilityEngine._find_traceability_citations(db=db, ticker=ticker, topic="ALL")
+        return {
+            "ticker": ticker.upper(),
+            "total_documents": len(citations),
+            "citations": citations
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Traceability audit failed: {str(e)}")
+
+@router.get("/explainability/history/{ticker}")
+def list_explainability_history(ticker: str, limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+    """Lists past explainability audits and SHAP runs."""
+    runs = (
+        db.query(ExplainabilityRun)
+        .filter(ExplainabilityRun.ticker == ticker.upper())
+        .order_by(ExplainabilityRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "explain_id": r.explain_id,
+            "ticker": r.ticker,
+            "target_type": r.target_type,
+            "target_id": r.target_id,
+            "key_drivers": json.loads(r.key_drivers_json) if r.key_drivers_json else [],
+            "confidence_score": r.confidence_score,
+            "created_at": r.created_at.isoformat()
+        }
+        for r in runs
+    ]
+
+
 

@@ -30,3 +30,30 @@ requests==2.32.3
 
 # Knowledge Management & Vector Embeddings (FR-010 to FR-014)
 fastembed==0.9.0
+
+# AI Orchestration (FR-015 to FR-023)
+crewai==0.80.0
+crewai-tools==0.17.0
+
+# LangChain Framework
+langchain==0.3.7
+langchain-community==0.3.5
+langchain-google-genai==2.0.5
+langchain-core==0.3.15
+
+# Vector Database
+chromadb==0.5.18
+
+# LLM & Embeddings
+google-generativeai==0.8.3
+sentence-transformers==3.3.0
+
+# ML Forecasting (FR-028 to FR-033)
+prophet==1.1.6
+statsmodels==0.14.4
+scikit-learn==1.5.2
+xgboost==2.1.2
+numpy==1.26.4
+
+# Explainable AI & SHAP (FR-041 to FR-044)
+shap==0.51.0

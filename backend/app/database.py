@@ -29,7 +29,11 @@ def init_db():
         document_chunk,
         update_log,
         market_intelligence,
-        multi_agent
+        multi_agent,
+        predictions,
+        scenario,
+        recommendations,
+        explainability
     )
     Base.metadata.create_all(bind=engine)
 

@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agentic AI Financial Intelligence & Data Management Platform",
-    description="Enterprise Financial Intelligence Engine implementing FR-001 (5-Year Historical Ingestion), FR-002 (Multi-Type Document Ingestion), FR-003 (Structured Financial Metrics), and FR-004 (Automated Report Watcher).",
+    description="Enterprise Financial Intelligence Engine implementing FR-001 to FR-004 (Data Management), FR-005 to FR-009 (Market Intelligence), FR-010 to FR-014 (Knowledge & RAG), FR-015 to FR-023 (Multi-Agent System), FR-028 to FR-033 (Predictive Analytics), FR-034 to FR-036 (Scenario Analysis), and FR-037 to FR-040 (Strategic Recommendations).",
     version="1.0.0",
     lifespan=lifespan
 )

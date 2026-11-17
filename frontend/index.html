@@ -86,6 +86,30 @@
           <span class="badge badge-fr">FR-015–023</span>
         </a>
       </div>
+
+      <div class="nav-group">
+        <span class="nav-label">Predictive Analytics</span>
+        <a href="#" class="nav-item" data-tab="predictions" id="nav-predictions">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          ML Predictions
+          <span class="badge badge-fr">FR-028–033</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="scenarios" id="nav-scenarios">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+          Scenario Analysis
+          <span class="badge badge-fr">FR-034–036</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="recommendations" id="nav-recommendations">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+          Recommendations
+          <span class="badge badge-fr">FR-037–040</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="explainability" id="nav-explainability">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Explainable AI (SHAP)
+          <span class="badge badge-fr">FR-041–044</span>
+        </a>
+      </div>
     </nav>
 
 
@@ -1143,8 +1167,422 @@
         </div>
       </div>
     </section>
-  </main>
 
+    <!-- ===== ML PREDICTIONS TAB (FR-028–033) ===== -->
+    <section class="tab-panel" id="tab-predictions">
+      <div class="intel-header-banner">
+        <div class="intel-banner-content">
+          <div class="intel-badges-row">
+            <span class="badge badge-fr">FR-028</span>
+            <span class="badge badge-fr">FR-029</span>
+            <span class="badge badge-fr">FR-030</span>
+            <span class="badge badge-fr">FR-031</span>
+            <span class="badge badge-fr">FR-032</span>
+            <span class="badge badge-fr">FR-033</span>
+          </div>
+          <h2 class="intel-banner-title">ML Predictive Analytics</h2>
+          <p class="intel-banner-desc">Run multi-model ML forecasts (Prophet, ARIMA, XGBoost, Linear) and compare by RMSE, MAE, MAPE.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              Forecast Configuration
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label" for="pred-ticker">Ticker Symbol</label>
+              <input type="text" id="pred-ticker" class="form-input" placeholder="e.g. AAPL, MSFT" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="pred-forecast-type">Forecast Type</label>
+              <select id="pred-forecast-type" class="form-input">
+                <option value="REVENUE">Revenue</option>
+                <option value="EBITDA">EBITDA</option>
+                <option value="NET_INCOME">Profit (Net Income)</option>
+                <option value="CASH_FLOW">Cash Flow</option>
+                <option value="DEMAND">Demand</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="pred-horizon">Horizon</label>
+              <select id="pred-horizon" class="form-input">
+                <option value="QUARTERLY">Quarterly</option>
+                <option value="ANNUAL">Annual</option>
+                <option value="THREE_YEAR">Three-Year</option>
+                <option value="FIVE_YEAR">Five-Year</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="runPrediction()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Run ML Forecast
+              </button>
+              <button class="btn btn-secondary" onclick="retrainModels()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+                Retrain Models <span class="badge badge-fr">FR-033</span>
+              </button>
+            </div>
+            <div id="pred-run-result" class="result-box hidden" style="margin-top:12px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Prediction History</h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadPredictionHistory(document.getElementById('pred-ticker').value)">Refresh</button>
+          </div>
+          <div id="pred-history-container" class="card-body">
+            <div class="empty-state"><p>Enter a ticker and run a forecast to see history.</p></div>
+          </div>
+        </div>
+      </div>
+      <div id="pred-results-area" class="hidden">
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Best Model</h2></div>
+          <div class="card-body" id="pred-best-model-body"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Model Comparison (FR-031 / FR-032)</h2></div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>Model</th><th>RMSE</th><th>MAE</th><th>MAPE</th><th>Status</th><th>Best</th></tr></thead>
+              <tbody id="pred-model-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Forecast Chart</h2></div>
+          <div class="card-body" id="pred-chart-container"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Historical vs. Forecast Data</h2></div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>Period</th><th>Type</th><th>Value</th></tr></thead>
+              <tbody id="pred-data-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCENARIO ANALYSIS TAB (FR-034–036) ===== -->
+    <section class="tab-panel" id="tab-scenarios">
+      <div class="intel-header-banner">
+        <div class="intel-banner-content">
+          <div class="intel-badges-row">
+            <span class="badge badge-fr">FR-034 Scenario Engine</span>
+            <span class="badge badge-fr">FR-035 5 Scenario Types</span>
+            <span class="badge badge-fr">FR-036 LLM Narrative</span>
+          </div>
+          <h2 class="intel-banner-title">What-If Scenario Analysis</h2>
+          <p class="intel-banner-desc">Simulate macroeconomic shocks and estimate financial impact on Revenue, EBITDA, Net Profit, Cash Flow, and EPS.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Scenario Builder
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label" for="scenario-ticker">Ticker Symbol</label>
+              <input type="text" id="scenario-ticker" class="form-input" placeholder="e.g. AAPL" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="scenario-type">Scenario Type</label>
+              <select id="scenario-type" class="form-input" onchange="updateScenarioParams()">
+                <option value="CURRENCY_FLUCTUATION">Currency Fluctuation</option>
+                <option value="TARIFF_INCREASE">Tariff Increase</option>
+                <option value="INTEREST_RATE_CHANGE">Interest Rate Change</option>
+                <option value="SUPPLY_CHAIN_DISRUPTION">Supply Chain Disruption</option>
+                <option value="MARKET_DOWNTURN">Market Downturn</option>
+              </select>
+            </div>
+            <!-- Dynamic Parameter Sections -->
+            <div class="scenario-param-group active" id="spg-CURRENCY_FLUCTUATION">
+              <div class="form-group">
+                <label class="form-label" for="sp-currency-pair">Currency Pair</label>
+                <input type="text" id="sp-currency-pair" class="form-input" placeholder="e.g. USD/EUR" value="USD/EUR" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Change % <span id="sp-change-pct-val">0</span>%</label>
+                <input type="range" id="sp-change-pct" class="form-input" min="-30" max="30" value="0" oninput="document.getElementById('sp-change-pct-val').textContent=this.value" style="width:100%;" />
+              </div>
+            </div>
+            <div class="scenario-param-group" id="spg-TARIFF_INCREASE">
+              <div class="form-group">
+                <label class="form-label" for="sp-affected-regions">Affected Regions (comma-separated)</label>
+                <input type="text" id="sp-affected-regions" class="form-input" placeholder="e.g. China, Europe" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sp-tariff-rate">Tariff Rate (%)</label>
+                <input type="number" id="sp-tariff-rate" class="form-input" value="25" min="0" max="200" />
+              </div>
+            </div>
+            <div class="scenario-param-group" id="spg-INTEREST_RATE_CHANGE">
+              <div class="form-group">
+                <label class="form-label">Rate Change (bps) <span id="sp-rate-bps-val">0</span></label>
+                <input type="range" id="sp-rate-change-bps" class="form-input" min="-300" max="300" value="0" oninput="document.getElementById('sp-rate-bps-val').textContent=this.value" style="width:100%;" />
+              </div>
+            </div>
+            <div class="scenario-param-group" id="spg-SUPPLY_CHAIN_DISRUPTION">
+              <div class="form-group">
+                <label class="form-label" for="sp-severity">Severity</label>
+                <select id="sp-severity" class="form-input">
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM" selected>MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sp-duration-months">Duration (months)</label>
+                <input type="number" id="sp-duration-months" class="form-input" value="6" min="1" max="60" />
+              </div>
+            </div>
+            <div class="scenario-param-group" id="spg-MARKET_DOWNTURN">
+              <div class="form-group">
+                <label class="form-label">Downturn Severity % <span id="sp-downturn-val">-20</span>%</label>
+                <input type="range" id="sp-downturn-severity" class="form-input" min="-50" max="0" value="-20" oninput="document.getElementById('sp-downturn-val').textContent=this.value" style="width:100%;" />
+              </div>
+            </div>
+            <button class="btn btn-primary btn-full" style="margin-top:16px;" onclick="runScenario()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Run Scenario Analysis
+            </button>
+            <div id="scenario-run-result" class="result-box hidden" style="margin-top:12px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Scenario History</h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadScenarioHistory(document.getElementById('scenario-ticker').value)">Refresh</button>
+          </div>
+          <div id="scenario-history-container" class="card-body">
+            <div class="empty-state"><p>Run a scenario to see history here.</p></div>
+          </div>
+        </div>
+      </div>
+      <div id="scenario-results-area" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Quantitative Impact</h2>
+            <span id="scenario-confidence-badge" class="health-badge"></span>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Current Value</th>
+                  <th>Impact ($)</th>
+                  <th>Impact (%)</th>
+                  <th>Post-Scenario Value</th>
+                </tr>
+              </thead>
+              <tbody id="scenario-impact-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">LLM Narrative Analysis (FR-036)</h2></div>
+            <div class="card-body" id="scenario-narrative-body" style="line-height:1.7;"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Risk Mitigation Strategies</h2></div>
+            <div class="card-body" id="scenario-mitigations-body"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RECOMMENDATIONS TAB (FR-037–040) ===== -->
+    <section class="tab-panel" id="tab-recommendations">
+      <div class="intel-header-banner">
+        <div class="intel-banner-content">
+          <div class="intel-badges-row">
+            <span class="badge badge-fr">FR-037 Generate</span>
+            <span class="badge badge-fr">FR-038 6 Categories</span>
+            <span class="badge badge-fr">FR-039 Priority Rank</span>
+            <span class="badge badge-fr">FR-040 LLM Justification</span>
+          </div>
+          <h2 class="intel-banner-title">Strategic Recommendations</h2>
+          <p class="intel-banner-desc">AI-powered strategic recommendations across Cost Optimization, Investment, Risk, Market, Pricing, and Capital Allocation — ranked by priority score.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+              Generate Recommendations
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label" for="recom-ticker">Ticker Symbol</label>
+              <input type="text" id="recom-ticker" class="form-input" placeholder="e.g. AAPL" autocomplete="off" />
+            </div>
+            <button class="btn btn-primary btn-full" onclick="generateStrategicRecommendations()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              Generate Recommendations
+            </button>
+            <div id="recom-run-result" class="result-box hidden" style="margin-top:12px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Report History</h2>
+            <button class="btn btn-ghost btn-sm" onclick="loadRecommendationHistory(document.getElementById('recom-ticker').value)">Refresh</button>
+          </div>
+          <div id="recom-history-container" class="card-body">
+            <div class="empty-state"><p>Generate recommendations to see history.</p></div>
+          </div>
+        </div>
+      </div>
+      <div id="recom-results-area" class="hidden">
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Executive Summary</h2></div>
+          <div class="card-body" id="recom-exec-summary" style="line-height:1.7;"></div>
+        </div>
+        <div style="padding:12px 0;">
+          <div class="category-pills" id="recom-filter-pills">
+            <button class="cat-pill active" onclick="filterRecommendations('ALL')">All</button>
+            <button class="cat-pill" onclick="filterRecommendations('COST_OPTIMIZATION')">Cost Optimization</button>
+            <button class="cat-pill" onclick="filterRecommendations('INVESTMENT_PRIORITIZATION')">Investment</button>
+            <button class="cat-pill" onclick="filterRecommendations('RISK_MITIGATION')">Risk</button>
+            <button class="cat-pill" onclick="filterRecommendations('MARKET_EXPANSION')">Market</button>
+            <button class="cat-pill" onclick="filterRecommendations('PRICING_STRATEGIES')">Pricing</button>
+            <button class="cat-pill" onclick="filterRecommendations('CAPITAL_ALLOCATION')">Capital</button>
+          </div>
+        </div>
+        <div id="recom-cards-container"></div>
+      </div>
+    </section>
+
+    <!-- ===== EXPLAINABLE AI & SHAP TAB (FR-041–044) ===== -->
+    <section class="tab-panel" id="tab-explainability">
+      <div class="intel-header-banner">
+        <div class="intel-banner-content">
+          <div class="intel-badges-row">
+            <span class="badge badge-fr">FR-041 Prediction Explainability</span>
+            <span class="badge badge-fr">FR-042 Recommendation Drivers</span>
+            <span class="badge badge-fr">FR-043 SHAP Feature Importance</span>
+            <span class="badge badge-fr">FR-044 Document Traceability</span>
+          </div>
+          <h2 class="intel-banner-title">Explainable AI & Audit Traceability</h2>
+          <p class="intel-banner-desc">SHAP-based feature importance attribution, key recommendation decision drivers, and verifiable primary source document traceability.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Explainability Audit Controls
+            </h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label" for="explain-ticker">Ticker Symbol</label>
+              <input type="text" id="explain-ticker" class="form-input" placeholder="e.g. AAPL" value="AAPL" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="explain-target-type">Audit Focus</label>
+              <select id="explain-target-type" class="form-input" onchange="toggleExplainAuditType()">
+                <option value="PREDICTION">Prediction SHAP Feature Importance (FR-041/043)</option>
+                <option value="RECOMMENDATION">Strategic Recommendation Drivers (FR-042)</option>
+                <option value="TRACEABILITY">Source Document Audit Citations (FR-044)</option>
+              </select>
+            </div>
+            <div class="form-group" id="explain-metric-group">
+              <label class="form-label" for="explain-metric">Target Metric (for Prediction SHAP)</label>
+              <select id="explain-metric" class="form-input">
+                <option value="REVENUE">Revenue</option>
+                <option value="EBITDA">EBITDA</option>
+                <option value="PROFIT">Profit (Net Income)</option>
+                <option value="CASH_FLOW">Operating Cash Flow</option>
+                <option value="DEMAND">Demand</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="runExplainabilityAudit()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Run Explainability Audit
+            </button>
+            <div id="explain-run-result" class="result-box hidden" style="margin-top:12px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Explainability Summary</h2>
+          </div>
+          <div class="card-body" id="explain-summary-card">
+            <div class="empty-state"><p>Run an audit to view mathematical feature attribution and document citations.</p></div>
+          </div>
+        </div>
+      </div>
+      <div id="explain-results-area" class="hidden">
+        <!-- SHAP Feature Importance Section -->
+        <div class="card" id="explain-shap-card">
+          <div class="card-header">
+            <h2 class="card-title">SHAP Feature Importance & Factor Attribution (FR-043)</h2>
+            <span class="badge badge-fr" id="explain-base-val-badge">Base Value: $0</span>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Value</th>
+                  <th>SHAP Value</th>
+                  <th>Directional Influence</th>
+                  <th>Impact Description</th>
+                </tr>
+              </thead>
+              <tbody id="explain-shap-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Recommendation Drivers Section -->
+        <div class="card hidden" id="explain-drivers-card">
+          <div class="card-header">
+            <h2 class="card-title">Key Decision Drivers Influencing Recommendations (FR-042)</h2>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Pillar</th>
+                  <th>Key Driver</th>
+                  <th>Current Metric</th>
+                  <th>Weight</th>
+                  <th>Rationale</th>
+                </tr>
+              </thead>
+              <tbody id="explain-drivers-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Source Document Traceability Citations -->
+        <div class="card" id="explain-traceability-card">
+          <div class="card-header">
+            <h2 class="card-title">Primary Source Document Traceability (FR-044)</h2>
+            <span class="health-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;">Verified Provenance</span>
+          </div>
+          <div class="card-body" id="explain-traceability-container"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
 
   <!-- Modal for Creating / Registering a Market Event (FR-007) -->
   <div class="modal-overlay hidden" id="create-event-modal">

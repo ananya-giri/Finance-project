@@ -106,6 +106,15 @@ class SchedulerService:
             MarketIntelligenceService.collect_all_indicators(db)
             MarketIntelligenceService.collect_live_market_news(db)
             
+            # FR-033: Periodic prediction model retraining for tracked companies
+            from backend.app.services.prediction_engine import PredictionEngine
+            companies = db.query(Company).filter(Company.auto_sync_enabled == True).all()
+            for comp in companies:
+                try:
+                    PredictionEngine.retrain_models(db, comp.ticker)
+                except Exception as ex:
+                    logger.debug(f"Retrain check for {comp.ticker}: {ex}")
+
             # Log continuous market intelligence sync
             log = UpdateLog(
                 ticker="GLOBAL_MACRO",
@@ -113,7 +122,7 @@ class SchedulerService:
                 status="SUCCESS",
                 report_type_detected="ECONOMIC_INDICATORS_AND_NEWS",
                 fiscal_period_detected=datetime.utcnow().strftime("%Y-%m-%d"),
-                details="FR-005 & FR-008: Continuous collection of 6 indicator categories and market news completed."
+                details="FR-005 & FR-008 & FR-033: Continuous collection of indicators, news sync, and periodic prediction model retraining completed."
             )
             db.add(log)
             db.commit()

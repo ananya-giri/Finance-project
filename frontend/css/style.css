@@ -2755,3 +2755,40 @@ body {
   color: var(--text-muted);
 }
 
+/* Scenario Analysis Dynamic Parameters */
+.scenario-param-group {
+  display: none;
+}
+.scenario-param-group.active {
+  display: block;
+}
+
+/* Category Filter Pills (Recommendations) */
+.category-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.cat-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cat-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.cat-pill.active {
+  background: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+}
+
+

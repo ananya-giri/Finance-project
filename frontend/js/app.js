@@ -76,7 +76,11 @@ function switchTab(tabId) {
     scheduler: { title: 'Auto-Monitoring', sub: 'FR-004: Automated Report & Statement Watcher' },
     'market-intelligence': { title: 'External Market Intelligence', sub: 'FR-005 to FR-009: Macro Indicators, Geopolitics, Regulations, News & Impact Classifier' },
     rag: { title: 'Knowledge Base & RAG', sub: 'FR-010 to FR-014: Persistent Vector Storage, Semantic Search & Grounded Recommendations' },
-    orchestration: { title: 'Multi-Agent Orchestration', sub: 'FR-015 to FR-023: Autonomous AI Agent Collective & Strategic Consensus Engine' }
+    orchestration: { title: 'Multi-Agent Orchestration', sub: 'FR-015 to FR-023: Autonomous AI Agent Collective & Strategic Consensus Engine' },
+    predictions: { title: 'Predictive Analytics', sub: 'FR-028 to FR-033: Multi-Model Machine Learning Projections & Periodic Retraining' },
+    scenarios: { title: 'Scenario Analysis', sub: 'FR-034 to FR-036: What-If Shocks, Macro Sensitivity & Financial Impact' },
+    recommendations: { title: 'Strategic Recommendations', sub: 'FR-037 to FR-040: Priority-Ranked 6-Pillar Strategic Directives with Justification' },
+    explainability: { title: 'Explainable AI & SHAP', sub: 'FR-041 to FR-044: SHAP Attribution, Decision Drivers & Document Traceability' }
   };
 
   if (titles[tabId]) {
@@ -2754,4 +2758,684 @@ function exportDossierJson() {
   downloadAnchor.remove();
   showToast('Dossier JSON exported successfully');
 }
+
+
+// ============================================================================
+// SECTION 2.6: PREDICTIVE ANALYTICS (FR-028 to FR-033)
+// ============================================================================
+
+async function runPrediction() {
+  const ticker = (document.getElementById('pred-ticker')?.value || 'AAPL').trim().toUpperCase();
+  const forecast_type = document.getElementById('pred-forecast-type')?.value || 'REVENUE';
+  const horizon = document.getElementById('pred-horizon')?.value || 'ANNUAL';
+  const resultBox = document.getElementById('pred-run-result');
+
+  if (resultBox) {
+    resultBox.classList.remove('hidden');
+    resultBox.innerHTML = '<div class="spinner"></div> Running ML forecasting models (Prophet, ARIMA, XGBoost, Linear)...';
+  }
+
+  try {
+    const res = await fetch('/api/predictions/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, forecast_type, horizon })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Prediction failed');
+    }
+
+    const data = await res.json();
+    renderPredictionResults(data);
+    loadPredictionHistory(ticker);
+    if (resultBox) {
+      resultBox.innerHTML = `<strong>Forecast complete!</strong> Best Model: <strong>${data.best_model}</strong> (MAPE: ${data.best_mape}%)`;
+    }
+    showToast(`Forecast complete for ${ticker}`);
+  } catch (err) {
+    if (resultBox) resultBox.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+    showToast(`Prediction failed: ${err.message}`);
+  }
+}
+
+function renderPredictionResults(data) {
+  const resultsArea = document.getElementById('pred-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  // Best model card
+  const bestBody = document.getElementById('pred-best-model-body');
+  if (bestBody) {
+    bestBody.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="font-size:1.4rem; color:#fff; font-weight:800;">${data.best_model}</h3>
+          <p style="color:var(--text-muted); font-size:0.85rem;">Automatically selected for lowest Mean Absolute Percentage Error (MAPE)</p>
+        </div>
+        <div style="text-align:right;">
+          <span class="health-badge" style="font-size:1.1rem; padding:6px 14px; background:rgba(34,197,94,0.15); color:#22c55e;">
+            MAPE: ${data.best_mape}%
+          </span>
+          <div style="color:var(--text-muted); font-size:0.75rem; margin-top:4px;">FR-032 Performance Comparison</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Model comparison table
+  const modelTableBody = document.getElementById('pred-model-table-body');
+  if (modelTableBody && data.models) {
+    modelTableBody.innerHTML = data.models.map(m => `
+      <tr style="${m.is_best ? 'background:rgba(34,197,94,0.06);' : ''}">
+        <td><strong>${m.model}</strong></td>
+        <td>${m.rmse ? `$${m.rmse.toLocaleString()}` : 'N/A'}</td>
+        <td>${m.mae ? `$${m.mae.toLocaleString()}` : 'N/A'}</td>
+        <td><strong>${m.mape !== null ? `${m.mape}%` : 'N/A'}</strong></td>
+        <td><span class="badge ${m.status === 'SUCCESS' ? 'badge-success' : 'badge-danger'}">${m.status}</span></td>
+        <td>${m.is_best ? '<span class="health-badge" style="background:#22c55e;color:#fff;font-size:0.7rem;">BEST</span>' : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Forecast chart bars
+  const chartContainer = document.getElementById('pred-chart-container');
+  const forecasts = data.forecasts && data.forecasts[data.best_model] ? data.forecasts[data.best_model] : [];
+  if (chartContainer && forecasts.length > 0) {
+    const maxVal = Math.max(...forecasts.map(f => f.value), 1);
+    chartContainer.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        ${forecasts.map(f => {
+          const pct = Math.max(8, Math.min(100, Math.round((f.value / maxVal) * 100)));
+          return `
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
+                <span><strong>${f.period}</strong></span>
+                <span><strong>${data.forecast_type === 'DEMAND' ? `${f.value.toFixed(1)} Index` : `$${(f.value / 1e9).toFixed(2)}B`}</strong> (${data.best_model})</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.08); border-radius:6px; height:20px; overflow:hidden;">
+                <div style="background:linear-gradient(90deg, #6366f1, #06b6d4); width:${pct}%; height:100%; border-radius:6px;"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // Historical vs forecast table
+  const dataTableBody = document.getElementById('pred-data-table-body');
+  if (dataTableBody) {
+    const histRows = (data.historical || []).map(h => `
+      <tr>
+        <td>${h.period}</td>
+        <td><span class="badge badge-secondary">HISTORICAL</span></td>
+        <td><strong>${data.forecast_type === 'DEMAND' ? `${h.value} (Base 100)` : `$${(h.value / 1e9).toFixed(2)}B`}</strong></td>
+      </tr>
+    `).join('');
+
+    const fcRows = forecasts.map(f => `
+      <tr style="background:rgba(99,102,241,0.06);">
+        <td><strong>${f.period}</strong></td>
+        <td><span class="badge badge-success">FORECAST (${data.best_model})</span></td>
+        <td><strong>${data.forecast_type === 'DEMAND' ? `${f.value.toFixed(1)} (Projected)` : `$${(f.value / 1e9).toFixed(2)}B`}</strong></td>
+      </tr>
+    `).join('');
+
+    dataTableBody.innerHTML = histRows + fcRows;
+  }
+}
+
+async function retrainModels() {
+  const ticker = (document.getElementById('pred-ticker')?.value || 'AAPL').trim().toUpperCase();
+  showToast(`Initiating periodic model retraining for ${ticker}... (FR-033)`);
+  try {
+    const res = await fetch(`/api/predictions/retrain/${ticker}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Retraining failed');
+    const data = await res.json();
+    showToast(`Retrained ${data.models_retrained?.length || 5} models for ${ticker}`);
+    loadPredictionHistory(ticker);
+  } catch (err) {
+    showToast(`Retraining failed: ${err.message}`);
+  }
+}
+
+async function loadPredictionHistory(ticker) {
+  if (!ticker) ticker = document.getElementById('pred-ticker')?.value || 'AAPL';
+  const container = document.getElementById('pred-history-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/predictions/${ticker}`);
+    if (!res.ok) throw new Error('Failed to load history');
+    const runs = await res.json();
+
+    if (!runs || runs.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No prediction runs recorded yet for this ticker.</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Horizon</th><th>Best Model</th><th>MAPE</th><th>Status</th></tr></thead>
+          <tbody>
+            ${runs.map(r => `
+              <tr>
+                <td style="font-size:0.75rem;">${new Date(r.created_at).toLocaleDateString()}</td>
+                <td><strong>${r.forecast_type}</strong></td>
+                <td>${r.horizon}</td>
+                <td><span class="badge badge-primary">${r.best_model || '—'}</span></td>
+                <td>${r.best_mape !== null ? `${r.best_mape}%` : '—'}</td>
+                <td><span class="badge badge-success">${r.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#ef4444;font-size:0.85rem;">${err.message}</p>`;
+  }
+}
+
+
+// ============================================================================
+// SECTION 2.7: SCENARIO ANALYSIS (FR-034 to FR-036)
+// ============================================================================
+
+function updateScenarioParams() {
+  const type = document.getElementById('scenario-type')?.value;
+  document.querySelectorAll('.scenario-param-group').forEach(el => el.classList.remove('active'));
+  const activeEl = document.getElementById(`spg-${type}`);
+  if (activeEl) activeEl.classList.add('active');
+}
+
+async function runScenario() {
+  const ticker = (document.getElementById('scenario-ticker')?.value || 'AAPL').trim().toUpperCase();
+  const scenario_type = document.getElementById('scenario-type')?.value || 'CURRENCY_FLUCTUATION';
+  const resultBox = document.getElementById('scenario-run-result');
+
+  let parameters = {};
+  if (scenario_type === 'CURRENCY_FLUCTUATION') {
+    parameters = {
+      currency_pair: document.getElementById('sp-currency-pair')?.value || 'USD/EUR',
+      change_pct: parseFloat(document.getElementById('sp-change-pct')?.value || 0)
+    };
+  } else if (scenario_type === 'TARIFF_INCREASE') {
+    const rawReg = document.getElementById('sp-affected-regions')?.value || 'China, Europe';
+    parameters = {
+      affected_regions: rawReg.split(',').map(s => s.trim()).filter(Boolean),
+      tariff_rate_pct: parseFloat(document.getElementById('sp-tariff-rate')?.value || 25)
+    };
+  } else if (scenario_type === 'INTEREST_RATE_CHANGE') {
+    parameters = {
+      rate_change_bps: parseInt(document.getElementById('sp-rate-change-bps')?.value || 0)
+    };
+  } else if (scenario_type === 'SUPPLY_CHAIN_DISRUPTION') {
+    parameters = {
+      severity: document.getElementById('sp-severity')?.value || 'MEDIUM',
+      duration_months: parseInt(document.getElementById('sp-duration-months')?.value || 6)
+    };
+  } else if (scenario_type === 'MARKET_DOWNTURN') {
+    parameters = {
+      downturn_severity_pct: parseFloat(document.getElementById('sp-downturn-severity')?.value || -20)
+    };
+  }
+
+  if (resultBox) {
+    resultBox.classList.remove('hidden');
+    resultBox.innerHTML = '<div class="spinner"></div> Simulating macro shock & generating LLM impact narrative...';
+  }
+
+  try {
+    const res = await fetch('/api/scenarios/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, scenario_type, parameters })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Simulation failed');
+    }
+
+    const data = await res.json();
+    renderScenarioResults(data);
+    loadScenarioHistory(ticker);
+    if (resultBox) {
+      resultBox.innerHTML = `<strong>Simulation complete!</strong> Impact Severity: <strong>${data.impacts?.overall_impact_severity}</strong>`;
+    }
+    showToast(`What-If analysis finished for ${ticker}`);
+  } catch (err) {
+    if (resultBox) resultBox.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+    showToast(`Simulation error: ${err.message}`);
+  }
+}
+
+function renderScenarioResults(data) {
+  const resultsArea = document.getElementById('scenario-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  const confBadge = document.getElementById('scenario-confidence-badge');
+  if (confBadge) {
+    confBadge.textContent = `Severity: ${data.impacts?.overall_impact_severity || 'MODERATE'} (Confidence: ${data.confidence_score}%)`;
+    confBadge.style.background = data.impacts?.overall_impact_severity === 'CRITICAL' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)';
+    confBadge.style.color = data.impacts?.overall_impact_severity === 'CRITICAL' ? '#ef4444' : '#f59e0b';
+  }
+
+  // Quantitative table
+  const tbody = document.getElementById('scenario-impact-tbody');
+  if (tbody && data.impacts) {
+    const metrics = [
+      { key: 'revenue', label: 'Revenue' },
+      { key: 'ebitda', label: 'EBITDA' },
+      { key: 'net_profit', label: 'Net Profit' },
+      { key: 'operating_cash_flow', label: 'Operating Cash Flow' },
+      { key: 'eps', label: 'EPS' }
+    ];
+
+    tbody.innerHTML = metrics.map(m => {
+      const d = data.impacts[m.key];
+      if (!d) return '';
+      const isNegative = d.delta < 0;
+      const color = isNegative ? '#ef4444' : '#22c55e';
+      const isEps = m.key === 'eps';
+      const fmt = (v) => isEps ? `$${v.toFixed(2)}` : `$${(v / 1e9).toFixed(2)}B`;
+      return `
+        <tr>
+          <td><strong>${m.label}</strong></td>
+          <td>${fmt(d.baseline)}</td>
+          <td style="color:${color}; font-weight:700;">${d.delta > 0 ? '+' : ''}${fmt(d.delta)}</td>
+          <td style="color:${color}; font-weight:700;">${d.change_pct > 0 ? '+' : ''}${d.change_pct}%</td>
+          <td><strong>${fmt(d.post_scenario)}</strong></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Narrative
+  const narrBody = document.getElementById('scenario-narrative-body');
+  if (narrBody && data.narrative_analysis) {
+    narrBody.innerHTML = `<div style="font-size:0.88rem; color:var(--text-primary); white-space:pre-line;">${data.narrative_analysis}</div>`;
+  }
+
+  // Mitigations
+  const mitBody = document.getElementById('scenario-mitigations-body');
+  if (mitBody && data.risk_mitigations) {
+    mitBody.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        ${data.risk_mitigations.map(m => `
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:12px;">
+            <span class="badge badge-primary" style="margin-bottom:6px; display:inline-block;">${m.horizon}</span>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin:0;">${m.action}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+async function loadScenarioHistory(ticker) {
+  if (!ticker) ticker = document.getElementById('scenario-ticker')?.value || 'AAPL';
+  const container = document.getElementById('scenario-history-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/scenarios/${ticker}`);
+    if (!res.ok) throw new Error('Failed to load history');
+    const runs = await res.json();
+
+    if (!runs || runs.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No scenario runs recorded yet for this ticker.</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Severity</th><th>Confidence</th></tr></thead>
+          <tbody>
+            ${runs.map(r => `
+              <tr>
+                <td style="font-size:0.75rem;">${new Date(r.created_at).toLocaleDateString()}</td>
+                <td><strong>${r.scenario_name || r.scenario_type}</strong></td>
+                <td><span class="badge badge-warning">${r.impacts?.overall_impact_severity || 'MODERATE'}</span></td>
+                <td>${r.confidence_score}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#ef4444;font-size:0.85rem;">${err.message}</p>`;
+  }
+}
+
+
+// ============================================================================
+// SECTION 2.8: RECOMMENDATION GENERATION (FR-037 to FR-040)
+// ============================================================================
+
+let currentRecommendationsList = [];
+
+async function generateStrategicRecommendations() {
+  const ticker = (document.getElementById('recom-ticker')?.value || 'AAPL').trim().toUpperCase();
+  const resultBox = document.getElementById('recom-run-result');
+
+  if (resultBox) {
+    resultBox.classList.remove('hidden');
+    resultBox.innerHTML = '<div class="spinner"></div> Synthesizing 6-pillar recommendations via LangChain & ChromaDB RAG...';
+  }
+
+  try {
+    const res = await fetch('/api/recommendations/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Recommendation generation failed');
+    }
+
+    const data = await res.json();
+    currentRecommendationsList = data.recommendations || [];
+    renderRecommendations(data);
+    loadRecommendationHistory(ticker);
+
+    if (resultBox) {
+      resultBox.innerHTML = `<strong>Recommendations generated!</strong> ${data.total_recommendations} action items ranked.`;
+    }
+    showToast(`Generated 6 strategic recommendations for ${ticker}`);
+  } catch (err) {
+    if (resultBox) resultBox.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+    showToast(`Generation error: ${err.message}`);
+  }
+}
+
+function renderRecommendations(data) {
+  const resultsArea = document.getElementById('recom-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  const execSummary = document.getElementById('recom-exec-summary');
+  if (execSummary && data.executive_summary) {
+    execSummary.innerHTML = `<div style="font-size:0.9rem; color:var(--text-primary); white-space:pre-line;">${data.executive_summary}</div>`;
+  }
+
+  filterRecommendations('ALL');
+}
+
+function filterRecommendations(category) {
+  document.querySelectorAll('#recom-filter-pills .cat-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toUpperCase().includes(category.replace('_', ' ')) || (category === 'ALL' && btn.textContent === 'All'));
+  });
+
+  const container = document.getElementById('recom-cards-container');
+  if (!container) return;
+
+  const filtered = category === 'ALL'
+    ? currentRecommendationsList
+    : currentRecommendationsList.filter(r => r.category === category);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No recommendations in this category.</p></div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      ${filtered.map(r => {
+        const priorityColor = r.priority === 'HIGH' ? '#ef4444' : (r.priority === 'MEDIUM' ? '#f59e0b' : '#22c55e');
+        return `
+          <div class="card" style="border-left: 4px solid ${priorityColor}; padding:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+              <div>
+                <span style="font-size:0.75rem; color:${priorityColor}; font-weight:800; text-transform:uppercase;">
+                  Rank #${r.priority_rank} • ${r.priority} Priority (Score: ${r.priority_score}/100)
+                </span>
+                <h3 style="font-size:1.1rem; color:#fff; font-weight:700; margin-top:4px;">${r.title}</h3>
+                <span class="badge badge-secondary" style="margin-top:4px; display:inline-block;">${r.category_name}</span>
+              </div>
+              <span class="badge badge-sm" style="background:rgba(255,255,255,0.08);">${r.timeframe}</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.03); border-radius:6px; padding:12px; margin:10px 0;">
+              <span style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Expected Impact</span>
+              <p style="font-size:0.85rem; color:#60a5fa; margin:2px 0 0 0; font-weight:600;">${r.expected_impact}</p>
+            </div>
+            <div style="margin-top:10px;">
+              <span style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Financial Justification (FR-040)</span>
+              <p style="font-size:0.84rem; color:var(--text-secondary); line-height:1.5; margin-top:4px;">${r.justification}</p>
+            </div>
+            ${r.action_steps && r.action_steps.length > 0 ? `
+              <div style="margin-top:10px;">
+                <span style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Strategic Action Steps</span>
+                <ul style="padding-left:18px; margin-top:4px; font-size:0.82rem; color:var(--text-primary); line-height:1.5;">
+                  ${r.action_steps.map(s => `<li>${s}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+async function loadRecommendationHistory(ticker) {
+  if (!ticker) ticker = document.getElementById('recom-ticker')?.value || 'AAPL';
+  const container = document.getElementById('recom-history-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/recommendations/${ticker}`);
+    if (!res.ok) throw new Error('Failed to load history');
+    const reports = await res.json();
+
+    if (!reports || reports.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No previous recommendation dossiers recorded for this ticker.</p></div>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Report Title</th><th>Top Priority</th><th>Status</th></tr></thead>
+          <tbody>
+            ${reports.map(rep => `
+              <tr>
+                <td style="font-size:0.75rem;">${new Date(rep.created_at).toLocaleDateString()}</td>
+                <td><strong>${rep.title}</strong></td>
+                <td><span class="badge badge-primary">${rep.top_priority_category || 'COST_OPTIMIZATION'}</span></td>
+                <td><span class="badge badge-success">${rep.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#ef4444;font-size:0.85rem;">${err.message}</p>`;
+  }
+}
+
+
+// ============================================================================
+// SECTION 2.9: EXPLAINABLE AI & SHAP (FR-041 to FR-044)
+// ============================================================================
+
+function toggleExplainAuditType() {
+  const auditType = document.getElementById('explain-target-type')?.value;
+  const metricGroup = document.getElementById('explain-metric-group');
+  if (metricGroup) {
+    metricGroup.style.display = auditType === 'PREDICTION' ? 'block' : 'none';
+  }
+}
+
+async function runExplainabilityAudit() {
+  const ticker = (document.getElementById('explain-ticker')?.value || 'AAPL').trim().toUpperCase();
+  const targetType = document.getElementById('explain-target-type')?.value || 'PREDICTION';
+  const forecast_type = document.getElementById('explain-metric')?.value || 'REVENUE';
+  const resultBox = document.getElementById('explain-run-result');
+
+  if (resultBox) {
+    resultBox.classList.remove('hidden');
+    resultBox.innerHTML = '<div class="spinner"></div> Computing SHAP values, decision attribution & source traceability...';
+  }
+
+  try {
+    let data;
+    if (targetType === 'PREDICTION') {
+      const res = await fetch('/api/explainability/prediction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, forecast_type, horizon: 'ANNUAL' })
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Prediction explainability failed');
+      data = await res.json();
+      renderPredictionExplain(data);
+    } else if (targetType === 'RECOMMENDATION') {
+      const res = await fetch('/api/explainability/recommendation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker })
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Recommendation drivers failed');
+      data = await res.json();
+      renderRecommendationExplain(data);
+    } else {
+      const res = await fetch(`/api/explainability/traceability/${ticker}`);
+      if (!res.ok) throw new Error('Traceability audit failed');
+      data = await res.json();
+      renderTraceabilityMap(data);
+    }
+
+    if (resultBox) {
+      resultBox.innerHTML = `<strong>Audit complete!</strong> Traceability verified with high confidence.`;
+    }
+    showToast(`Explainability audit complete for ${ticker}`);
+  } catch (err) {
+    if (resultBox) resultBox.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+    showToast(`Audit failed: ${err.message}`);
+  }
+}
+
+function renderPredictionExplain(data) {
+  const resultsArea = document.getElementById('explain-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  document.getElementById('explain-shap-card')?.classList.remove('hidden');
+  document.getElementById('explain-drivers-card')?.classList.add('hidden');
+
+  // Summary
+  const sumCard = document.getElementById('explain-summary-card');
+  if (sumCard) {
+    sumCard.innerHTML = `<div style="font-size:0.88rem; color:var(--text-primary); white-space:pre-line;">${data.narrative_explanation}</div>`;
+  }
+
+  // Base value badge
+  const bBadge = document.getElementById('explain-base-val-badge');
+  if (bBadge) bBadge.textContent = `Base Value E[f(x)]: $${(data.base_value / 1e9).toFixed(2)}B`;
+
+  // SHAP table
+  const tbody = document.getElementById('explain-shap-tbody');
+  if (tbody && data.feature_importance) {
+    tbody.innerHTML = data.feature_importance.map(f => {
+      const isPos = f.shap_value >= 0;
+      const color = isPos ? '#22c55e' : '#ef4444';
+      return `
+        <tr>
+          <td><strong>${f.display_name}</strong></td>
+          <td>${f.feature_value.toLocaleString()}</td>
+          <td style="color:${color}; font-weight:800;">${f.shap_value > 0 ? '+' : ''}${(f.shap_value / 1e9).toFixed(2)}B</td>
+          <td><span class="badge ${isPos ? 'badge-success' : 'badge-danger'}">${f.directional_influence}</span></td>
+          <td style="font-size:0.84rem; color:var(--text-secondary);">${f.impact_description}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  renderTraceabilityCitations(data.traceability_sources);
+}
+
+function renderRecommendationExplain(data) {
+  const resultsArea = document.getElementById('explain-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  document.getElementById('explain-shap-card')?.classList.add('hidden');
+  document.getElementById('explain-drivers-card')?.classList.remove('hidden');
+
+  const sumCard = document.getElementById('explain-summary-card');
+  if (sumCard) {
+    sumCard.innerHTML = `<div style="font-size:0.88rem; color:var(--text-primary); white-space:pre-line;">${data.narrative_explanation}</div>`;
+  }
+
+  const tbody = document.getElementById('explain-drivers-tbody');
+  if (tbody && data.key_drivers) {
+    tbody.innerHTML = data.key_drivers.map(d => `
+      <tr>
+        <td><strong>${d.pillar}</strong></td>
+        <td>${d.key_driver}</td>
+        <td><span class="badge badge-secondary">${d.driver_value}</span></td>
+        <td><strong>${d.weight_pct}%</strong></td>
+        <td style="font-size:0.84rem; color:var(--text-secondary);">${d.rationale}</td>
+      </tr>
+    `).join('');
+  }
+
+  renderTraceabilityCitations(data.traceability_sources);
+}
+
+function renderTraceabilityMap(data) {
+  const resultsArea = document.getElementById('explain-results-area');
+  if (resultsArea) resultsArea.classList.remove('hidden');
+
+  document.getElementById('explain-shap-card')?.classList.add('hidden');
+  document.getElementById('explain-drivers-card')?.classList.add('hidden');
+
+  const sumCard = document.getElementById('explain-summary-card');
+  if (sumCard) {
+    sumCard.innerHTML = `
+      <p style="font-size:0.9rem; color:var(--text-primary);">
+        Found <strong>${data.total_documents} primary source documents</strong> supporting financial models and strategic directives for <strong>${data.ticker}</strong>.
+      </p>
+    `;
+  }
+
+  renderTraceabilityCitations(data.citations);
+}
+
+function renderTraceabilityCitations(citations) {
+  const container = document.getElementById('explain-traceability-container');
+  if (!container) return;
+
+  if (!citations || citations.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No source citations mapped.</p></div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      ${citations.map(c => `
+        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:6px; padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="badge badge-primary">${c.document_type}</span>
+              <strong style="color:#fff; font-size:0.9rem;">${c.document_title}</strong>
+              <span style="color:var(--text-muted); font-size:0.75rem;">(Page ${c.page_number} • ${c.fiscal_period})</span>
+            </div>
+            <span class="badge badge-success" style="font-size:0.7rem;">${c.provenance_status}</span>
+          </div>
+          <p style="font-size:0.83rem; color:var(--text-secondary); font-style:italic; margin:4px 0;">"${c.excerpt}"</p>
+          <span style="font-family:var(--font-mono, monospace); font-size:0.72rem; color:var(--text-muted); display:block; margin-top:6px;">
+            SHA-256: ${c.sha256_hash}
+          </span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 

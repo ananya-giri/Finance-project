@@ -6,6 +6,10 @@ from backend.app.models.document_chunk import DocumentChunk
 from backend.app.models.update_log import UpdateLog
 from backend.app.models.market_intelligence import EconomicIndicator, MarketIntelligenceEvent
 from backend.app.models.multi_agent import OrchestrationRun, AgentExecutionTrace
+from backend.app.models.predictions import PredictionRun, ModelRegistry
+from backend.app.models.scenario import ScenarioRun
+from backend.app.models.recommendations import StrategicRecommendationReport
+from backend.app.models.explainability import ExplainabilityRun
 
 __all__ = [
     "Company",
@@ -17,6 +21,10 @@ __all__ = [
     "EconomicIndicator",
     "MarketIntelligenceEvent",
     "OrchestrationRun",
-    "AgentExecutionTrace"
+    "AgentExecutionTrace",
+    "PredictionRun",
+    "ModelRegistry",
+    "ScenarioRun",
+    "StrategicRecommendationReport",
+    "ExplainabilityRun"
 ]
-

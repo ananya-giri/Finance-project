@@ -264,6 +264,38 @@ class RAGService:
 
         db.commit()
 
+        # --- ChromaDB dual-write: also persist chunks to ChromaDB for LangChain/CrewAI tools ---
+        chroma_indexed = False
+        try:
+            from backend.app.services.chroma_service import ChromaService
+            chroma_metadatas = []
+            for idx, chunk_text in enumerate(chunks):
+                chunk_meta = dict(doc_meta)
+                chunk_meta["chunk_index"] = idx
+                chroma_metadatas.append(chunk_meta)
+
+            chroma_result = ChromaService.add_document_chunks(
+                ticker=doc.ticker,
+                doc_id=str(doc.id),
+                chunks=chunks,
+                metadatas=chroma_metadatas
+            )
+            chroma_indexed = chroma_result.get("status") == "INDEXED"
+            if chroma_indexed:
+                logger.info(
+                    f"ChromaDB: persisted {len(chunks)} chunks for doc #{doc.id} "
+                    f"({doc.ticker}) — collection 'financial_documents'."
+                )
+            else:
+                logger.warning(f"ChromaDB dual-write skipped/failed for doc #{doc.id}: {chroma_result}")
+        except Exception as chroma_err:
+            # ChromaDB failure must not break the primary SQLite indexing path
+            logger.warning(
+                f"ChromaDB dual-write failed for doc #{doc.id} — "
+                f"SQLite index is intact. Error: {chroma_err}"
+            )
+        # ------------------------------------------------------------------------------------
+
         logger.info(f"Indexed document #{doc.id} ({doc.title}) into {len(created_chunks)} persistent vector chunks.")
         return {
             "status": "INDEXED",
@@ -272,7 +304,8 @@ class RAGService:
             "title": doc.title,
             "chunks_count": len(created_chunks),
             "embedding_model": EMBEDDING_MODEL_NAME,
-            "vector_dimension": VECTOR_DIMENSION
+            "vector_dimension": VECTOR_DIMENSION,
+            "chroma_indexed": chroma_indexed
         }
 
     @staticmethod

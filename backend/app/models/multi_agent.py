@@ -1,5 +1,6 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+# pyrefly: ignore[missing-import]
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime
 from backend.app.database import Base
 
 class OrchestrationRun(Base):
