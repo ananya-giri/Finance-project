@@ -42,10 +42,14 @@ app.add_middleware(
 # Include API Router
 app.include_router(router)
 
-# Mount Frontend static files
-FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+# Mount Frontend static files (Prioritize React Claymorphic SPA Build)
+REACT_DIST_DIR = Path(__file__).resolve().parent.parent.parent / "frontend-react" / "dist"
+VANILLA_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+
+if REACT_DIST_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(REACT_DIST_DIR), html=True), name="frontend-react")
+elif VANILLA_FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(VANILLA_FRONTEND_DIR), html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
